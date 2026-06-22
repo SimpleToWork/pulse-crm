@@ -7,7 +7,7 @@
 // so this mainly stops other sites from borrowing the API key / quota.
 // Add your production domain(s) here once deployed.
 const ALLOWED_ORIGINS = [
-  "https://pulse-crm.vercel.app"
+  "https://pulse-crm-blush.vercel.app"
 ];
 
 export default async function handler(req, res) {
