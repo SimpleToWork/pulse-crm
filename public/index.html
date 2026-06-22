@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PulseCRM</title>
+<link rel="icon" type="image/png" href="/mbi-logo.png">
+<link rel="apple-touch-icon" href="/mbi-logo.png">
 <!--
   ============================================================
   PulseCRM — hosted build (Firebase Firestore + Claude API)
@@ -67,8 +69,7 @@
   .shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh;}
   .sidebar{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh;}
   .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;}
-  .brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(91,91,240,.4);flex:none;}
-  .brand .logo svg{width:17px;height:17px;}
+  .brand .logo{width:30px;height:30px;object-fit:contain;flex:none;}
   .brand b{font-size:18px;font-weight:600;}
   .nav{display:flex;flex-direction:column;gap:2px;}
   .nav button{display:flex;align-items:center;gap:11px;border:none;background:transparent;color:var(--muted);font-size:13.5px;font-weight:500;padding:9px 11px;border-radius:var(--r-sm);cursor:pointer;text-align:left;transition:background .14s,color .14s;width:100%;}
@@ -88,6 +89,7 @@
   .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 26px;background:color-mix(in srgb,var(--canvas) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
   .search{flex:1;max-width:440px;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 12px;color:var(--faint);font-size:13px;cursor:pointer;transition:border-color .14s;}
   .search:hover{border-color:var(--accent);}
+  .search svg{width:16px;height:16px;flex:none;}
   .search kbd{margin-left:auto;font-family:inherit;font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--muted);}
   .topbar .sp{flex:1;}
   .iconbtn{width:36px;height:36px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:background .14s,color .14s;}
@@ -282,8 +284,7 @@
   .setupwarn{background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);color:var(--warn);border-radius:var(--r-sm);padding:10px 14px;font-size:12.5px;margin:0 26px;}
   .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(1200px 600px at 70% -10%,var(--accent-soft),transparent),var(--canvas);}
   .login-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow-lg);padding:34px;text-align:center;}
-  .login-card .logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 6px 20px rgba(91,91,240,.45);}
-  .login-card .logo svg{width:26px;height:26px;}
+  .login-card .logo{width:56px;height:56px;object-fit:contain;display:block;margin:0 auto 16px;}
   .login-card h1{font-size:24px;margin-bottom:6px;}
   .login-card p{font-size:13.5px;color:var(--muted);margin:0 0 22px;}
   .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);font-size:14px;font-weight:500;cursor:pointer;transition:background .14s;}
@@ -314,14 +315,14 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 
 /* ============== CONFIG — FILL THESE IN ============== */
 const firebaseConfig = {
-  apiKey: "AIzaSyAmBP7Jra-HJk73wshcljS1W--N7jYbldY",
+  apiKey: "PASTE_FIREBASE_API_KEY",
   authDomain: "pulse-crm-60582.firebaseapp.com",
   projectId: "pulse-crm-60582",
   storageBucket: "pulse-crm-60582.firebasestorage.app",
   messagingSenderId: "841081792490",
   appId: "1:841081792490:web:54617faa9bd87ed991b493"
 };
-const AI_ENDPOINT = "/api/claude";       // co-located Vercel function — same-origin, no CORS
+const AI_ENDPOINT = "https://pulse-crm-blush.vercel.app/api/claude";       // co-located Vercel function — same-origin, no CORS
 // Only Google accounts on this Workspace domain may sign in. Set "" to allow ANY Google account.
 const ALLOWED_DOMAIN = "merchantsbi.com";
 /* ==================================================== */
@@ -497,7 +498,7 @@ function renderSidebar(){
   const u=state.user;
   $("#sidebar").className="sidebar"+(state.sideOpen?" show":"");
   $("#sidebar").innerHTML=`
-    <div class="brand"><span class="logo">${I.pulse}</span><b>PulseCRM</b></div>
+    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>PulseCRM</b></div>
     <nav class="nav">${nav}</nav>
     <div class="side-foot">
       <div class="me">${ava(u.name||u.email,30)}<div class="info"><div class="nm">${esc(u.name||"You")}</div><div class="em">${esc(u.email)}</div></div></div>
@@ -1073,7 +1074,7 @@ document.addEventListener("keydown",e=>{
 ==================================================================== */
 function renderLogin(){
   $("#root").innerHTML=`<div class="login"><div class="login-card">
-    <span class="logo">${I.pulse}</span>
+    <img class="logo" src="/mbi-logo.png" alt="MerchantsBI">
     <h1>PulseCRM</h1>
     <p>Your AI-native CRM for closing more deals with less chaos.</p>
     <button class="gbtn" id="gbtn"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button>
