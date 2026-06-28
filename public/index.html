@@ -498,7 +498,7 @@ function renderSidebar(){
   const u=state.user;
   $("#sidebar").className="sidebar"+(state.sideOpen?" show":"");
   $("#sidebar").innerHTML=`
-    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>PulseCRM</b></div>
+    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>merchantsbi</b></div>
     <nav class="nav">${nav}</nav>
     <div class="side-foot">
       <div class="me">${ava(u.name||u.email,30)}<div class="info"><div class="nm">${esc(u.name||"You")}</div><div class="em">${esc(u.email)}</div></div></div>
