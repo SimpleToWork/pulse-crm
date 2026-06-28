@@ -106,4 +106,3 @@ Visual automation builder, calendar/email sync (Gmail/Outlook/Google Calendar), 
 file attachments, deeper analytics, and the integration placeholders shown in Settings. The data
 model and app shell are structured so these slot in without a rewrite.
 
-<!-- crm-deploytest-243769c -->
