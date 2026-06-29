@@ -1,5 +1,12 @@
 {
   "name": "pulse-crm",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "scripts": {
+    "seed": "node scripts/seed.js",
+    "seed:force": "node scripts/seed.js --force"
+  },
+  "devDependencies": {
+    "firebase-admin": "^12.0.0"
+  }
 }

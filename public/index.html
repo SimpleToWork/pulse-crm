@@ -97,6 +97,10 @@
   .sidebar.collapsed .nav button{justify-content:center;padding:9px 0;}
   .sidebar.collapsed .nav-collapse-btn svg{transform:rotate(180deg);}
   .sidebar.collapsed .nav .badge{display:none;}
+  /* keep expand button accessible when collapsed */
+  .sidebar.collapsed .brand{padding-left:0;padding-right:0;justify-content:center;}
+  .sidebar.collapsed .brand .logo{display:none;}
+  .sidebar.collapsed .nav-collapse-btn{margin-left:0;}
 
   .main{display:flex;flex-direction:column;min-width:0;}
   .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 26px;background:color-mix(in srgb,var(--canvas) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
