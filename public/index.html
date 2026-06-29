@@ -581,12 +581,28 @@ const AI_FIELDS=[
 // implementation cost, timeline (days), and monthly cost; only future quotes
 // reflect edits. [name, implCost, timelineDays, monthlyCost]
 const DEFAULT_INTEGRATIONS=[
+  // Generic / custom
   ["OAuth",2500,7,150],["Database",4000,10,200],["API",3500,10,200],["Other",3000,10,150],
-  ["NetSuite",8000,30,500],["Shopify Plus",5000,14,300],["BigCommerce",4500,14,275],
-  ["Amazon",6000,21,400],["Walmart",6000,21,400],["Extensiv",5500,18,350],
-  ["ShipStation",4000,12,250],["QuickBooks",4500,14,275],["Magento",5500,18,350],
-  ["Meta",3500,10,200],["Retail Pro",6500,24,400],["Heartland Retail",6000,21,375],
-  ["Light Speed",5000,16,300],["Snowflake",7000,28,450],["BigQuery",7000,28,450],
+  // E-commerce & marketplaces
+  ["NetSuite",5000,21,1000],["Shopify Plus",5000,14,1000],["BigCommerce",5000,14,1000],
+  ["Amazon",5000,14,1000],["Walmart",5000,14,1000],["Extensiv",5000,14,1000],
+  ["ShipStation",5000,14,1000],["QuickBooks",5000,14,1000],["Magento",5000,14,1000],
+  ["Retail Pro",5000,14,1000],["Heartland Retail",5000,14,1000],["Lightspeed",5000,14,1000],
+  ["Shopify",5000,14,1000],["Stripe",5000,10,1000],
+  // Analytics & databases
+  ["Snowflake",5000,14,1000],["BigQuery",5000,14,1000],["PostgreSQL",5000,14,1000],
+  ["MySQL/MariaDB",5000,14,1000],["Microsoft SQL Server",5000,14,1000],["MongoDB",5000,14,1000],
+  ["Oracle DB",5000,21,1000],
+  // CRM & business apps
+  ["Salesforce",5000,14,1000],["HubSpot",5000,14,1000],["Zendesk",5000,14,1000],
+  ["SAP",5000,21,1000],["Jira/Atlassian",5000,14,1000],
+  // Advertising & marketing
+  ["Meta",5000,14,1000],["Amazon Seller/Ads",5000,14,1000],["Google Ads",5000,14,1000],
+  ["Meta Ads",5000,14,1000],["Google Analytics (GA4)",5000,14,1000],
+  // Files & data pipelines
+  ["Google Sheets",5000,10,1000],["Excel/SharePoint",5000,10,1000],
+  ["CSV/Flat Files (S3)",5000,7,1000],["REST API/Webhooks",5000,10,1000],
+  ["Kafka/Streaming",5000,14,1000],
 ].map(([name,implCost,timeline,monthlyCost],i)=>({id:"int"+i,name,implCost,timeline,monthlyCost}));
 const QUOTE_STATUSES=["draft","sent","accepted","expired"];
 const QUOTE_STATUS_COLOR={draft:"#94a3b8",sent:"#5b5bf0",accepted:"#16a34a",expired:"#dc2626"};
@@ -661,7 +677,8 @@ const state={ page:"dashboard", detail:null, user:null,
   _slackChannels: localStorage.getItem("pulse-slack-channels")||"",
   _slackWebhookUrl: localStorage.getItem("pulse-slack-webhook")||"",
   _slackSyncing: false, _slackStatus: null,
-  _dashOwner:"" };
+  _dashOwner:"",
+  _aiCostPerUser: parseFloat(localStorage.getItem("pulse-ai-cost-per-user"))||0 };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
 
@@ -2474,6 +2491,15 @@ function renderSettings(c){
         <div class="card panel"><div class="panel-head"><h2>AI assistant</h2></div>
           <div style="font-size:13px;display:flex;align-items:center;gap:8px"><span class="chip"><span class="dot" style="background:${fbReady?"var(--ok)":"var(--warn)"}"></span>Proxy: /api/claude</span></div>
           <div class="faint" style="font-size:12px;margin-top:10px">Powered by Claude via a server-side proxy. Your API key never reaches the browser, and the assistant is scoped to this workspace only.</div></div>
+        <div class="card panel"><div class="panel-head"><h2>AI usage cost assumption</h2></div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Set the assumed AI cost per user per month. Used for internal pricing estimates and reporting — does not affect billing.</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:13px;font-weight:600;white-space:nowrap">$ / user / month</label>
+            <input id="ai-cost-input" type="number" min="0" step="0.01" value="${state._aiCostPerUser||""}" placeholder="0.00" style="width:110px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;background:var(--bg);color:var(--ink)">
+            <button class="btn sm primary" id="ai-cost-save">${I.check}Save</button>
+          </div>
+          ${state._aiCostPerUser>0?`<div class="faint" style="font-size:12px;margin-top:8px">Current assumption: <b>$${state._aiCostPerUser.toFixed(2)}</b> per user per month</div>`:""}
+        </div>
         <div class="card panel"><div class="panel-head"><h2>Integrations</h2></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div>
         <div class="card panel" id="clay-panel">
@@ -2546,6 +2572,8 @@ function renderSettings(c){
     </div>`;
   c.querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{state.theme=b.dataset.themeSet;localStorage.setItem("pulse-theme",state.theme);render();});
   $("#addmember").onclick=()=>memberForm();
+  const aiCostSave=$("#ai-cost-save");
+  if(aiCostSave)aiCostSave.onclick=()=>{const v=parseFloat(document.getElementById("ai-cost-input")?.value)||0;state._aiCostPerUser=v;localStorage.setItem("pulse-ai-cost-per-user",v);toast("AI cost assumption saved","ok");render();};
   const clayBtn=$("#clay-copy");
   if(clayBtn)clayBtn.onclick=()=>{const url=$("#clay-url-text")?.textContent||"";navigator.clipboard?.writeText(url).then(()=>{clayBtn.textContent="Copied!";setTimeout(()=>{clayBtn.textContent="Copy";},1500);}).catch(()=>{});}
   const sd=$("#seedbtn");if(sd)sd.onclick=()=>{ if(fbReady)seedLive(sd); else{seedDemo();toast("Sample data loaded","ok");} };
@@ -3127,14 +3155,14 @@ function quoteBuilderModal(prefill){
             <div class="field" style="margin:0"><label>AI users (seats)</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??20}"></div>
             <div class="field" style="margin:0"><label>Price / user / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??25}"></div>
             <div class="field" style="margin:0"><label>AI usage multiplier (×)</label>
-              <select id="qb-mult">${[1,1.5,2,3].map(m=>`<option value="${m}" ${(prefill?.users?.aiMultiplier??1)==m?"selected":""}>${m}×</option>`).join("")}</select></div>
+              <input id="qb-mult" type="number" min="0" step="0.1" value="${prefill?.users?.aiMultiplier??1}"></div>
           </div>
         </div>
         <div class="qb-section">
           <div class="qb-h">3 · Add-ons</div>
           <div class="qb-inputs3">
             <div class="field" style="margin:0"><label>Integration bundle / mo ($)</label><input id="qb-bundle" type="number" min="0" step="50" value="${prefill?.addons?.bundlePrice??0}"></div>
-            <div class="field" style="margin:0"><label>Data volume add-on / mo ($)</label><input id="qb-data" type="number" min="0" step="100" value="${prefill?.addons?.dataVolume??0}"></div>
+            <div class="field" style="margin:0"><label>Data volume tier</label><select id="qb-data">${[[0,"Standard — $0"],[1000,"Enhanced — $1,000"],[2000,"Extra — $2,000"],[3000,"Enterprise — $3,000"]].map(([v,l])=>`<option value="${v}" ${(prefill?.addons?.dataVolume??0)==v?"selected":""}>${l}</option>`).join("")}</select></div>
             <div class="field" style="margin:0"><label>Status</label><select id="qb-status">${QUOTE_STATUSES.map(s=>`<option value="${s}" ${(prefill?.status||"draft")===s?"selected":""}>${s}</option>`).join("")}</select></div>
           </div>
           <div class="faint" style="font-size:11.5px;margin-top:6px">Bundle auto-fills from the selected integrations' monthly cost — edit it to quote a flat package price.</div>
