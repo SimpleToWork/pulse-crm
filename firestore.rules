@@ -1,12 +1,8 @@
-// DEPRECATED: use firestore.rules + firebase.json instead.
-// Deploy rules with: firebase deploy --only firestore:rules
-// This file is kept only for reference — the canonical rules live in firestore.rules.
-//
-// To apply manually: paste the contents of firestore.rules into the Firebase console
-// Firestore → Rules tab for project pulse-crm-60582.
 rules_version = '2';
 
 // PulseCRM Firestore security rules.
+// Deploy with: firebase deploy --only firestore:rules
+//
 // Requires Firebase Authentication with Google sign-in enabled.
 // Allows read/write only for signed-in users whose verified Google email
 // is on the @merchantsbi.com Workspace domain.

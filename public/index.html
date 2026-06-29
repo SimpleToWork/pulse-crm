@@ -381,6 +381,10 @@
   .qtrow .qv{font-size:20px;font-weight:700;}
   .qtrow .qv.big{color:#5b5bf0;}
   .q-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;}
+  .q-head h2 svg{width:15px;height:15px;flex:none;vertical-align:middle;}
+  .cellname svg{width:15px;height:15px;flex:none;}
+  .setupwarn svg{width:13px;height:13px;flex:none;vertical-align:middle;}
+  .q-foot .faint svg{width:13px;height:13px;flex:none;vertical-align:middle;}
   /* deal form product lines */
   .dlines{display:flex;flex-direction:column;gap:6px;}
   .dline{display:grid;grid-template-columns:1fr 70px 110px 30px;gap:6px;align-items:center;}
@@ -726,7 +730,8 @@ async function dbUpdate(coll,id,patch,silent){
     if(fbReady){ await updateDoc(doc(db,coll,id),p); }
     else { const o=state[coll].find(x=>x.id===id); if(o)Object.assign(o,p); render(); }
     if(!silent)toast("Updated","ok");
-  }catch(e){ toast("Update failed: "+e.message,"err"); }
+    return true;
+  }catch(e){ toast("Update failed: "+e.message,"err"); return false; }
 }
 async function dbRemove(coll,id,label){ // soft delete
   try{
@@ -3433,9 +3438,10 @@ function quoteSettingsModal(){
   overlay.querySelector("#qsCancel").onclick=close;
   overlay.querySelector("#qsSave").onclick=async()=>{
     const payload={ai:readAi(),integrations:ints,aiCostOverride:state._aiCostPerUser||0};
-    if(settings._id)await dbUpdate("quoteSettings",settings._id,payload);
-    else await dbAdd("quoteSettings",payload);
-    close();
+    const ok=settings._id
+      ?await dbUpdate("quoteSettings",settings._id,payload)
+      :(await dbAdd("quoteSettings",payload))!=null;
+    if(ok)close();
   };
 }
 
