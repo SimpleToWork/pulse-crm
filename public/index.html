@@ -2475,6 +2475,7 @@ function renderSettings(c){
   const m=state.members.length?state.members:[{name:state.user.name,email:state.user.email,role:"Owner"}];
   const prods=live(state.products);
   const PROD_CAT_COLOR={Integration:"var(--accent)",AI:"#8b5cf6",Platform:"var(--ok)",Service:"var(--warn)"};
+  const intPricing=getQuoteSettings();
   c.innerHTML=`
     <div class="pagehead"><div><h1>Settings</h1><div class="sub">Workspace, team & integrations</div></div></div>
     <div class="grid2">
@@ -2569,11 +2570,28 @@ function renderSettings(c){
           ${p.price?`<div style="font-size:12px;font-weight:600;color:var(--accent)">${esc(p.price)}</div>`:""}
         </div>`).join("")}
       </div>`:`<div class="faint" style="font-size:13px;margin-top:4px">No products defined yet. Add your first product offering.</div>`}
+    </div>
+    <div class="card panel" style="margin-top:14px">
+      <div class="panel-head"><h2>Integration Pricing</h2><div style="display:flex;gap:8px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · future quotes only</span><button class="btn sm primary" id="addintprice">${I.plus}Add integration</button></div></div>
+      <div class="faint" style="font-size:12px;margin-bottom:12px">Implementation cost and monthly fee per platform. Auto-populated from defaults. Edit any row to override pricing for future quotes — saved quotes stay frozen.</div>
+      <div style="overflow-x:auto"><table class="qs-int-table" style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Platform / Integration</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Impl Cost</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Timeline</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Monthly</th><th style="padding:8px 6px;border-bottom:1px solid var(--line)"></th></tr></thead>
+        <tbody>${intPricing.integrations.map(it=>`<tr>
+          <td style="font-size:13px;font-weight:500;padding:7px 10px">${esc(it.name)}</td>
+          <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${money(it.implCost)}</td>
+          <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${it.timeline} days</td>
+          <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${money(it.monthlyCost)}/mo</td>
+          <td style="padding:7px 6px"><div style="display:flex;gap:3px;justify-content:flex-end">
+            <button class="iconbtn" data-intprice-edit="${esc(it.id)}" title="Edit">${I.edit}</button>
+            <button class="iconbtn" data-intprice-del="${esc(it.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button>
+          </div></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
     </div>`;
   c.querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{state.theme=b.dataset.themeSet;localStorage.setItem("pulse-theme",state.theme);render();});
   $("#addmember").onclick=()=>memberForm();
   const aiCostSave=$("#ai-cost-save");
-  if(aiCostSave)aiCostSave.onclick=()=>{const v=parseFloat(document.getElementById("ai-cost-input")?.value)||0;state._aiCostPerUser=v;localStorage.setItem("pulse-ai-cost-per-user",v);toast("AI cost assumption saved","ok");render();};
+  if(aiCostSave)aiCostSave.onclick=async()=>{const v=parseFloat(document.getElementById("ai-cost-input")?.value)||0;state._aiCostPerUser=v;localStorage.setItem("pulse-ai-cost-per-user",v);const qs=live(state.quoteSettings)[0];if(fbReady){if(qs)await dbUpdate("quoteSettings",qs.id,{aiCostOverride:v});else await dbAdd("quoteSettings",{ai:{...DEFAULT_AI},integrations:DEFAULT_INTEGRATIONS.map(x=>({...x})),aiCostOverride:v});}toast("AI cost assumption saved","ok");render();};
   const clayBtn=$("#clay-copy");
   if(clayBtn)clayBtn.onclick=()=>{const url=$("#clay-url-text")?.textContent||"";navigator.clipboard?.writeText(url).then(()=>{clayBtn.textContent="Copied!";setTimeout(()=>{clayBtn.textContent="Copy";},1500);}).catch(()=>{});}
   const sd=$("#seedbtn");if(sd)sd.onclick=()=>{ if(fbReady)seedLive(sd); else{seedDemo();toast("Sample data loaded","ok");} };
@@ -2586,6 +2604,16 @@ function renderSettings(c){
   $("#addproduct").onclick=()=>productForm();
   c.querySelectorAll("[data-edit-prod]").forEach(b=>b.onclick=()=>productForm(b.dataset.editProd));
   c.querySelectorAll("[data-del-prod]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this product?"))return;await dbRemove("products",b.dataset.delProd,"Product");render();});
+  $("#addintprice").onclick=()=>integrationPricingModal(null,c);
+  c.querySelectorAll("[data-intprice-edit]").forEach(b=>b.onclick=()=>integrationPricingModal(b.dataset.intpriceEdit,c));
+  c.querySelectorAll("[data-intprice-del]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Remove this integration from the pricing table?"))return;
+    const qs=getQuoteSettings();
+    const newInts=qs.integrations.filter(x=>x.id!==b.dataset.intpriceDel);
+    if(qs._id)await dbUpdate("quoteSettings",qs._id,{integrations:newInts});
+    else await dbAdd("quoteSettings",{ai:qs.ai,integrations:newInts});
+    toast("Integration removed","ok");render();
+  });
   ["instantly","smartlead"].forEach(svc=>{
     const keyIn=document.getElementById("etl-key-"+svc);
     const saveBtn=document.getElementById("etl-save-"+svc);
@@ -2609,6 +2637,71 @@ function renderSettings(c){
   if(slackSyncBtn)slackSyncBtn.onclick=()=>{const t=document.getElementById("slack-token")?.value.trim();const ch=document.getElementById("slack-channels")?.value.trim()||"";if(t){state._slackBotToken=t;state._slackChannels=ch;localStorage.setItem("pulse-slack-token",t);localStorage.setItem("pulse-slack-channels",ch);}syncSlack();};
   const slackTestBtn=$("#slack-test-btn");
   if(slackTestBtn)slackTestBtn.onclick=async()=>{const u=document.getElementById("slack-webhook")?.value.trim()||"";if(!u){toast("Enter a webhook URL first","err");return;}state._slackWebhookUrl=u;localStorage.setItem("pulse-slack-webhook",u);await notifySlack(`:white_check_mark: *PulseCRM test notification* — Slack outbound is configured correctly!`);toast("Test notification sent","ok");};
+}
+
+// Single-window modal for adding or editing an integration pricing record.
+// intId = null → add new; intId = string → edit existing.
+function integrationPricingModal(intId,contentEl){
+  const qs=getQuoteSettings();
+  const existing=intId?qs.integrations.find(x=>x.id===intId):null;
+  const overlay=document.createElement("div");
+  overlay.className="q-modal";
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.onclick=e=>{if(e.target===overlay)close();};
+
+  overlay.innerHTML=`<div class="q-box" style="width:min(480px,100%);max-height:92vh">
+    <div class="q-head"><h2>${existing?I.edit+" Edit integration":I.plus+" Add integration"}</h2><button class="iconbtn" id="ipX">${I.x}</button></div>
+    <div class="q-scroll" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div class="setupwarn" style="background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)">${I.lock} Changes apply to <b>future quotes only</b>. Existing quotes stay frozen.</div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Platform / Integration name *</label>
+        <input id="ip-name" class="input" style="width:100%" placeholder="e.g. Shopify Plus" value="${esc(existing?.name||"")}">
+      </div>
+      <div class="field-row">
+        <div style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Implementation cost ($) *</label>
+          <input id="ip-impl" class="input" type="number" min="0" step="100" style="width:100%" placeholder="5000" value="${existing!=null?existing.implCost:""}">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Timeline (days) *</label>
+          <input id="ip-days" class="input" type="number" min="1" step="1" style="width:100%" placeholder="14" value="${existing!=null?existing.timeline:""}">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Monthly cost ($/mo) *</label>
+        <input id="ip-monthly" class="input" type="number" min="0" step="25" style="width:100%" placeholder="1000" value="${existing!=null?existing.monthlyCost:""}">
+      </div>
+    </div>
+    <div class="q-foot">
+      <button class="btn" id="ipCancel">Cancel</button>
+      <button class="btn primary" id="ipSave">${existing?"Save changes":"Add integration"}</button>
+    </div>
+  </div>`;
+
+  overlay.querySelector("#ipX").onclick=close;
+  overlay.querySelector("#ipCancel").onclick=close;
+  overlay.querySelector("#ipSave").onclick=async()=>{
+    const name=overlay.querySelector("#ip-name").value.trim();
+    const implCost=parseFloat(overlay.querySelector("#ip-impl").value)||0;
+    const timeline=parseInt(overlay.querySelector("#ip-days").value)||0;
+    const monthlyCost=parseFloat(overlay.querySelector("#ip-monthly").value)||0;
+    if(!name){toast("Name is required","err");return;}
+    if(implCost<0||timeline<1||monthlyCost<0){toast("Please enter valid cost and timeline values","err");return;}
+    const freshQs=getQuoteSettings();
+    let newInts;
+    if(existing){
+      newInts=freshQs.integrations.map(x=>x.id===intId?{...x,name,implCost,timeline,monthlyCost}:x);
+    } else {
+      const newId="int"+Date.now()+(Math.random()*1e4|0);
+      newInts=[...freshQs.integrations,{id:newId,name,implCost,timeline,monthlyCost}];
+    }
+    if(freshQs._id)await dbUpdate("quoteSettings",freshQs._id,{integrations:newInts});
+    else await dbAdd("quoteSettings",{ai:freshQs.ai,integrations:newInts});
+    close();
+    toast(existing?"Integration updated":"Integration added","ok");
+    if(contentEl)renderSettings(contentEl);
+  };
 }
 
 function renderEtlCard(){
@@ -3339,7 +3432,7 @@ function quoteSettingsModal(){
   overlay.querySelector("#qsX").onclick=close;
   overlay.querySelector("#qsCancel").onclick=close;
   overlay.querySelector("#qsSave").onclick=async()=>{
-    const payload={ai:readAi(),integrations:ints};
+    const payload={ai:readAi(),integrations:ints,aiCostOverride:state._aiCostPerUser||0};
     if(settings._id)await dbUpdate("quoteSettings",settings._id,payload);
     else await dbAdd("quoteSettings",payload);
     close();
@@ -3666,6 +3759,7 @@ function subscribe(){
   const colls=["contacts","companies","deals","tasks","activities","members","tickets","products","templates","supportCategories","slaRules","quotes","quoteSettings"];
   colls.forEach(name=>onSnapshot(collection(db,name),snap=>{
     state[name]=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}}
     render();
   },err=>console.error(name,err)));
 }
