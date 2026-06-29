@@ -151,6 +151,8 @@
   .stat .val{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:600;margin-top:10px;letter-spacing:-.02em;}
   .stat .delta{font-size:12px;margin-top:3px;color:var(--muted);}
   .stat .delta.up{color:var(--ok);} .stat .delta.down{color:var(--danger);}
+  .stat[data-dash-nav]{cursor:pointer;transition:transform .15s,box-shadow .15s;}
+  .stat[data-dash-nav]:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.1);}
   .panel{padding:18px 20px;}
   .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
   .panel-head h2{font-size:15px;font-weight:600;}
@@ -615,6 +617,8 @@ const I={
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>',
   menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>',
   chevronLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  chevronDown:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  chevronUp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
   dollar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
   trophy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
   clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
@@ -639,13 +643,15 @@ const state={ page:"dashboard", detail:null, user:null,
   _qSort:{col:"createdAt",dir:"desc"}, _qSearch:"",
   theme: localStorage.getItem("pulse-theme")||"light", aiOpen:false, aiLog:[], cmdk:false, sideOpen:false,
   navCollapsed: localStorage.getItem("pulse-nav-collapsed")==="1",
+  activityCollapsed: localStorage.getItem("pulse-activity-collapsed")==="1",
   _supTab:"categories",
   _cSort:{col:"",dir:"asc"}, _cColF:{status:"",owner:""},
   _coSort:{col:"",dir:"asc"}, _coColF:{industry:"",owner:""}, _coTab:"all",
   _tSort:{col:"due",dir:"asc"}, _tColF:{priority:""},
-  _dSort:{col:"",dir:"asc"}, _dView:"",
+  _dSort:{col:"",dir:"asc"}, _dView:"", _pipeView:"bars",
   _tkSort:{col:"createdAt",dir:"desc"}, _tkColF:{status:"",priority:""}, _tkSearch:"",
   _tmplSearch:"", _tmplCat:"",
+  _dashTf: localStorage.getItem("pulse-dash-tf")||"30d",
   _etlInstantlyKey: localStorage.getItem("pulse-instantly-key")||"",
   _etlSmartleadKey: localStorage.getItem("pulse-smartlead-key")||"",
   _etlApolloKey: localStorage.getItem("pulse-apollo-key")||"",
@@ -654,7 +660,8 @@ const state={ page:"dashboard", detail:null, user:null,
   _slackBotToken: localStorage.getItem("pulse-slack-token")||"",
   _slackChannels: localStorage.getItem("pulse-slack-channels")||"",
   _slackWebhookUrl: localStorage.getItem("pulse-slack-webhook")||"",
-  _slackSyncing: false, _slackStatus: null };
+  _slackSyncing: false, _slackStatus: null,
+  _dashOwner:"" };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
 
@@ -673,6 +680,14 @@ function timeAgo(t){ if(!t)return"";const s=(Date.now()-t)/1000;
 const dayStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();};
 const isToday=t=>t&&dayStart(t)===dayStart(Date.now());
 const isOverdue=t=>t&&dayStart(t)<dayStart(Date.now());
+function tfStart(tf){
+  const now=Date.now(), d=new Date(); d.setHours(0,0,0,0);
+  if(tf==="7d")return now-7*864e5;
+  if(tf==="30d")return now-30*864e5;
+  if(tf==="90d")return now-90*864e5;
+  if(tf==="ytd"){d.setMonth(0,1);return d.getTime();}
+  return 0; // "all"
+}
 const companyById=id=>state.companies.find(c=>c.id===id);
 const contactById=id=>state.contacts.find(c=>c.id===id);
 const contactName=c=>c?`${c.firstName||""} ${c.lastName||""}`.trim():"";
@@ -1366,7 +1381,17 @@ function renderContent(){
 
 /* ---------------- Dashboard ---------------- */
 function renderDashboard(c){
-  const D=live(state.deals), C=live(state.contacts), T=live(state.tasks);
+  const tf=state._dashTf||"30d";
+  const since=tfStart(tf);
+  const tfLabels={"7d":"Last 7 days","30d":"Last 30 days","90d":"Last 90 days","ytd":"Year to date","all":"All time"};
+  const allDeals=live(state.deals), C=live(state.contacts), T=live(state.tasks);
+  // collect unique owners from deals for the filter dropdown
+  const owners=[...new Set(allDeals.map(d=>d.owner||"").filter(Boolean))].sort();
+  const selOwner=state._dashOwner||"";
+  // scope deals by timeframe first, then by owner
+  const Dtf=tf==="all"?allDeals:allDeals.filter(d=>(d.createdAt||0)>=since||(d.updatedAt||0)>=since);
+  const D=selOwner?Dtf.filter(d=>(d.owner||"")===selOwner):Dtf;
+  const Ctf=tf==="all"?C:C.filter(x=>(x.createdAt||0)>=since);
   const open=D.filter(d=>d.stage!=="Won"&&d.stage!=="Lost");
   const won=D.filter(d=>d.stage==="Won"), lost=D.filter(d=>d.stage==="Lost");
   const pipeVal=open.reduce((s,d)=>s+(+d.value||0),0);
@@ -1375,43 +1400,126 @@ function renderDashboard(c){
   const winRate=(won.length+lost.length)?Math.round(won.length/(won.length+lost.length)*100):0;
   const dueToday=T.filter(t=>t.status!=="done"&&isToday(t.due)).length;
   const overdue=T.filter(t=>t.status!=="done"&&isOverdue(t.due)).length;
-  const newWeek=C.filter(x=>x.createdAt>Date.now()-7*864e5).length;
+  const newInPeriod=tf==="all"?C.length:Ctf.length;
 
-  const stat=(lbl,val,icon,delta,cls)=>`<div class="card stat"><div class="lbl"><span class="ic">${icon}</span>${lbl}</div><div class="val">${val}</div>${delta?`<div class="delta ${cls||""}">${delta}</div>`:""}</div>`;
-  // stage breakdown
-  const maxStage=Math.max(1,...STAGES.filter(s=>s!=="Lost").map(s=>open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0)));
-  const bars=STAGES.filter(s=>s!=="Won"&&s!=="Lost").map(s=>{
-    const v=open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0);
-    return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:500">${s}</span><span class="muted">${moneyK(v)} · ${open.filter(d=>d.stage===s).length}</span></div>
-      <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(2,v/maxStage*100)}%;background:${STAGE_COLOR[s]};border-radius:5px;transition:width .4s"></div></div></div>`;
-  }).join("");
-  const acts=live(state.activities).sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
-  const feed=acts.length?acts.map((a,i)=>`<div class="tl-item"><div class="tl-rail"><div class="tl-node">${actIcon(a.type)}</div>${i<acts.length-1?'<div class="tl-line"></div>':""}</div>
-    <div class="tl-body"><div class="tx">${esc(a.text)}</div><div class="mt">${esc(a.actor||"")} · ${timeAgo(a.createdAt)}</div></div></div>`).join(""):emptyMini("No activity yet","Actions across your CRM show up here.");
+  const stat=(lbl,val,icon,delta,cls,nav)=>`<div class="card stat"${nav?` data-dash-nav="${nav}"`:""}><div class="lbl"><span class="ic">${icon}</span>${lbl}</div><div class="val">${val}</div>${delta?`<div class="delta ${cls||""}">${delta}</div>`:""}</div>`;
+  const newInPeriod=tf==="all"?C.length:Ctf.length;
+
+  // pipeline view helpers
+  const pv=state._pipeView||"bars";
+  const activeStages=STAGES.filter(s=>s!=="Won"&&s!=="Lost");
+
+  // view: horizontal bars by value (default)
+  const barsView=()=>{
+    const maxV=Math.max(1,...activeStages.map(s=>open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0)));
+    return activeStages.map(s=>{
+      const v=open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0), cnt=open.filter(d=>d.stage===s).length;
+      return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:500">${esc(s)}</span><span class="muted">${moneyK(v)} &middot; ${cnt}</span></div>
+        <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(2,v/maxV*100)}%;background:${STAGE_COLOR[s]};border-radius:5px;transition:width .4s"></div></div></div>`;
+    }).join("");
+  };
+
+  // view: horizontal bars by deal count
+  const countView=()=>{
+    const maxC=Math.max(1,...activeStages.map(s=>open.filter(d=>d.stage===s).length));
+    return activeStages.map(s=>{
+      const cnt=open.filter(d=>d.stage===s).length;
+      return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:500">${esc(s)}</span><span class="muted">${cnt} deal${cnt!==1?"s":""}</span></div>
+        <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(cnt?2:0,cnt/maxC*100)}%;background:${STAGE_COLOR[s]};border-radius:5px;transition:width .4s"></div></div></div>`;
+    }).join("");
+  };
+
+  // view: SVG donut chart by value
+  const donutView=()=>{
+    const sd=activeStages.map(s=>({s,v:open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0),c:STAGE_COLOR[s]})).filter(d=>d.v>0);
+    if(!sd.length) return emptyMini("No open deals","Add a deal to see your pipeline.");
+    const tot=sd.reduce((a,d)=>a+d.v,0)||1;
+    const R=65,r=38,cx=80,cy=80; let ang=-90;
+    const arcs=sd.map(d=>{
+      const pct=d.v/tot, sw=Math.min(pct*360,359.99);
+      const a1=ang*Math.PI/180, a2=(ang+sw)*Math.PI/180;
+      const x1=cx+R*Math.cos(a1),y1=cy+R*Math.sin(a1),x2=cx+R*Math.cos(a2),y2=cy+R*Math.sin(a2);
+      const ix1=cx+r*Math.cos(a1),iy1=cy+r*Math.sin(a1),ix2=cx+r*Math.cos(a2),iy2=cy+r*Math.sin(a2);
+      const lg=sw>180?1:0;
+      const p=`M${x1.toFixed(1)} ${y1.toFixed(1)} A${R} ${R} 0 ${lg} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} L${ix2.toFixed(1)} ${iy2.toFixed(1)} A${r} ${r} 0 ${lg} 0 ${ix1.toFixed(1)} ${iy1.toFixed(1)}Z`;
+      ang+=sw; return `<path d="${p}" fill="${d.c}"/>`;
+    }).join("");
+    const legend=sd.map(d=>`<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:2px;background:${d.c};flex:none"></div><span style="font-weight:500;flex:1">${esc(d.s)}</span><span class="muted">${moneyK(d.v)} &middot; ${Math.round(d.v/tot*100)}%</span></div>`).join("");
+    return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <svg width="160" height="160" viewBox="0 0 160 160" style="flex:none">${arcs}
+        <text x="80" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${moneyK(tot)}</text>
+        <text x="80" y="91" text-anchor="middle" font-size="10" fill="var(--muted)">open pipeline</text>
+      </svg>
+      <div style="flex:1;min-width:130px">${legend}</div>
+    </div>`;
+  };
+
+  const viewContent=pv==="count"?countView():pv==="donut"?donutView():barsView();
+  const vb=(v,lbl)=>`<button class="btn ghost sm" data-pipeview="${v}" style="${pv===v?"background:var(--surface-2);color:var(--ink)":""}">${lbl}</button>`;
+  const viewToggle=`<div style="display:flex;gap:3px">${vb("bars","Value")}${vb("count","Count")}${vb("donut","Donut")}</div>`;
+
+  // activity feed — filter by timeframe and owner
+  const allActs=live(state.activities);
+  let acts=(tf==="all"?allActs:allActs.filter(a=>(a.createdAt||0)>=since)).sort((a,b)=>b.createdAt-a.createdAt);
+  if(selOwner) acts=acts.filter(a=>(a.actor||"")===selOwner);
+  acts=acts.slice(0,8);
+  const feed=acts.length?acts.map((a,i)=>`<div class="tl-item"><div class="tl-rail"><div class="tl-node">${actIcon(a.type)}</div>${i<acts.length-1?’<div class="tl-line"></div>’:""}</div>
+    <div class="tl-body"><div class="tx">${esc(a.text)}</div><div class="mt">${esc(a.actor||"")} &middot; ${timeAgo(a.createdAt)}</div></div></div>`).join(""):emptyMini("No activity yet","Actions across your CRM show up here.");
+
+  const ownerOpts=`<option value="">All salespersons</option>${owners.map(o=>`<option value="${esc(o)}"${selOwner===o?" selected":""}>${esc(o)}</option>`).join("")}`;
+  const filterLabel=selOwner?`<span style="background:var(--accent-soft);color:var(--accent-ink);border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;margin-left:8px">${esc(selOwner)}</span>`:"";
+  const tfBtns=Object.entries(tfLabels).map(([k,v])=>`<button class="btn sm${tf===k?" primary":""}" data-dashtf="${k}">${v}</button>`).join("");
 
   c.innerHTML=`
-    <div class="pagehead"><div><h1>Dashboard</h1><div class="sub">Good to see you, ${esc((state.user.name||"there").split(" ")[0])}. Here’s your pipeline at a glance.</div></div>
-      <button class="btn" id="weeklyai">${I.spark}<span>Weekly AI summary</span></button></div>
+    <div class="pagehead"><div><h1>Dashboard${filterLabel}</h1><div class="sub">Good to see you, ${esc((state.user.name||"there").split(" ")[0])}. Here’s your pipeline at a glance.</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="input" id="dash-owner-filter" style="min-width:160px">${ownerOpts}</select>
+        <button class="btn" id="weeklyai">${I.spark}<span>Weekly AI summary</span></button>
+      </div></div>
+    <div class="toolbar" style="margin-bottom:16px">${tfBtns}</div>
     <div class="stats">
-      ${stat("Open pipeline",moneyK(pipeVal),I.dollar,open.length+" active deals")}
-      ${stat("Forecast (weighted)",moneyK(forecast),I.bar,"Prob-adjusted")}
-      ${stat("Won this period",moneyK(wonVal),I.trophy,won.length+" deals · "+winRate+"% win rate","up")}
-      ${stat("Total contacts",C.length,I.users,(newWeek?"+"+newWeek+" this week":"—"),newWeek?"up":"")}
-      ${stat("Due today",dueToday,I.clock,overdue?overdue+" overdue":"on track",overdue?"down":"up")}
+      ${stat("Open pipeline",moneyK(pipeVal),I.dollar,open.length+" active deals","","deals-open")}
+      ${stat("Forecast (weighted)",moneyK(forecast),I.bar,"Prob-adjusted","","deals-open")}
+      ${stat("Won this period",moneyK(wonVal),I.trophy,won.length+" deals &middot; "+winRate+"% win rate","up","deals-won")}
+      ${stat(tf==="all"?"Total contacts":"New contacts",tf==="all"?C.length:newInPeriod,I.users,(tf==="all"?"—":"+"+newInPeriod+" in period"),newInPeriod?"up":"","contacts")}
+      ${stat("Due today",dueToday,I.clock,overdue?overdue+" overdue":"on track",overdue?"down":"up","tasks-today")}
     </div>
     <div id="weeklyai-out"></div>
     <div class="grid2">
-      <div class="card panel"><div class="panel-head"><h2>Pipeline by stage</h2><span class="muted" style="font-size:12px">${moneyK(pipeVal)} open</span></div>${bars||emptyMini("No open deals","Add a deal to see your pipeline build.")}</div>
-      <div class="card panel"><div class="panel-head"><h2>Recent activity</h2></div><div class="timeline">${feed}</div></div>
+      <div class="card panel"><div class="panel-head"><h2>Pipeline by stage</h2>${viewToggle}</div>${viewContent||emptyMini("No open deals","Add a deal to see your pipeline build.")}</div>
+      <div class="card panel"><div class="panel-head"><h2>Recent activity</h2><button class="btn ghost sm" id="activity-toggle" title="${state.activityCollapsed?"Expand":"Collapse"} recent activity" style="padding:3px 7px;font-size:12px">${state.activityCollapsed?I.chevronDown:I.chevronUp}</button></div>${state.activityCollapsed?"":` <div class="timeline">${feed}</div>`}</div>
     </div>`;
+  $("#dash-owner-filter").onchange=e=>{state._dashOwner=e.target.value;renderDashboard(c);};
+  c.querySelectorAll("[data-dashtf]").forEach(btn=>btn.onclick=()=>{
+    state._dashTf=btn.dataset.dashtf;
+    localStorage.setItem("pulse-dash-tf",state._dashTf);
+    renderDashboard(c);
+  });
+  c.querySelectorAll("[data-dash-nav]").forEach(el=>{
+    el.onclick=()=>{
+      const nav=el.dataset.dashNav;
+      if(nav==="deals-won"){state.page="deals";state._dView="list";state._dStageF="Won";state._dPrioF="";}
+      else if(nav==="deals-open"){state.page="deals";state._dView=state._dView||"board";state._dStageF="";state._dPrioF="";}
+      else if(nav==="contacts"){state.page="contacts";}
+      else if(nav==="tasks-today"){state.page="tasks";state._tf="today";}
+      state.detail=null;render();
+    };
+  });
+  document.querySelectorAll("[data-pipeview]").forEach(b=>b.onclick=()=>{state._pipeView=b.dataset.pipeview;render();});
   $("#weeklyai").onclick=async()=>{
-    const btn=$("#weeklyai");btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Analyzing…`;
+    const btn=$("#weeklyai");btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Analyzing&hellip;`;
     const out=$("#weeklyai-out");
-    out.innerHTML=`<div class="insight" style="margin-bottom:18px"><div class="ih">${I.spark}PulseAI · Weekly summary</div><div class="ic-body"><span class="spin"></span> Reviewing your pipeline…</div></div>`;
-    try{ const t=await askAI("Summarize this week's sales performance in 4-5 short bullet points: pipeline health, what's progressing, what's at risk, and the single most important action for the team.");
+    out.innerHTML=`<div class="insight" style="margin-bottom:18px"><div class="ih">${I.spark}PulseAI &middot; Weekly summary</div><div class="ic-body"><span class="spin"></span> Reviewing your pipeline&hellip;</div></div>`;
+    const repCtx=selOwner?` Focus specifically on ${selOwner}’s performance.`:"";
+    try{ const t=await askAI(`Summarize this week’s sales performance in 4-5 short bullet points: pipeline health, what’s progressing, what’s at risk, and the single most important action for the team.${repCtx}`);
       out.querySelector(".ic-body").textContent=t; }
     catch(e){ out.querySelector(".ic-body").textContent="⚠️ "+e.message; }
     btn.disabled=false;btn.innerHTML=`${I.spark}<span>Weekly AI summary</span>`;
+  };
+  $("#activity-toggle").onclick=()=>{
+    state.activityCollapsed=!state.activityCollapsed;
+    localStorage.setItem("pulse-activity-collapsed",state.activityCollapsed?"1":"0");
+    render();
   };
 }
 function actIcon(t){return {deal:I.dollar,contact:I.users,note:I.note,task:I.check,stage:I.trello,email:I.mail,meeting:I.clock,linkedin:I.linkedin,phone:I.phone,call:I.phone}[t]||I.note;}
