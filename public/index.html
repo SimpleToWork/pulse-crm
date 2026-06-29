@@ -1258,7 +1258,7 @@ function render(){
         <aside class="sidebar" id="sidebar"></aside>
         <div class="main">
           <div class="topbar" id="topbar"></div>
-          ${fbReady?"":'<div class="setupwarn" style="margin-top:12px">⚙️ Demo mode — Firebase isn’t configured, so changes won’t persist. Paste your <b>firebaseConfig</b> in index.html to go live.</div>'}
+          ${fbReady?"":'<div class="setupwarn" style="margin-top:12px">⚙️ Demo mode — Firebase isn't configured, so changes won't persist. Paste your <b>firebaseConfig</b> in index.html to go live.</div>'}
           <div class="content" id="content"></div>
         </div>
       </div>
@@ -1462,7 +1462,7 @@ function renderDashboard(c){
   let acts=(tf==="all"?allActs:allActs.filter(a=>(a.createdAt||0)>=since)).sort((a,b)=>b.createdAt-a.createdAt);
   if(selOwner) acts=acts.filter(a=>(a.actor||"")===selOwner);
   acts=acts.slice(0,8);
-  const feed=acts.length?acts.map((a,i)=>`<div class="tl-item"><div class="tl-rail"><div class="tl-node">${actIcon(a.type)}</div>${i<acts.length-1?’<div class="tl-line"></div>’:""}</div>
+  const feed=acts.length?acts.map((a,i)=>`<div class="tl-item"><div class="tl-rail"><div class="tl-node">${actIcon(a.type)}</div>${i<acts.length-1?'<div class="tl-line"></div>':""}</div>
     <div class="tl-body"><div class="tx">${esc(a.text)}</div><div class="mt">${esc(a.actor||"")} &middot; ${timeAgo(a.createdAt)}</div></div></div>`).join(""):emptyMini("No activity yet","Actions across your CRM show up here.");
 
   const ownerOpts=`<option value="">All salespersons</option>${owners.map(o=>`<option value="${esc(o)}"${selOwner===o?" selected":""}>${esc(o)}</option>`).join("")}`;
@@ -1470,7 +1470,7 @@ function renderDashboard(c){
   const tfBtns=Object.entries(tfLabels).map(([k,v])=>`<button class="btn sm${tf===k?" primary":""}" data-dashtf="${k}">${v}</button>`).join("");
 
   c.innerHTML=`
-    <div class="pagehead"><div><h1>Dashboard${filterLabel}</h1><div class="sub">Good to see you, ${esc((state.user.name||"there").split(" ")[0])}. Here’s your pipeline at a glance.</div></div>
+    <div class="pagehead"><div><h1>Dashboard${filterLabel}</h1><div class="sub">Good to see you, ${esc((state.user.name||"there").split(" ")[0])}. Here's your pipeline at a glance.</div></div>
       <div style="display:flex;gap:8px;align-items:center">
         <select class="input" id="dash-owner-filter" style="min-width:160px">${ownerOpts}</select>
         <button class="btn" id="weeklyai">${I.spark}<span>Weekly AI summary</span></button>
@@ -1509,8 +1509,8 @@ function renderDashboard(c){
     const btn=$("#weeklyai");btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Analyzing&hellip;`;
     const out=$("#weeklyai-out");
     out.innerHTML=`<div class="insight" style="margin-bottom:18px"><div class="ih">${I.spark}PulseAI &middot; Weekly summary</div><div class="ic-body"><span class="spin"></span> Reviewing your pipeline&hellip;</div></div>`;
-    const repCtx=selOwner?` Focus specifically on ${selOwner}’s performance.`:"";
-    try{ const t=await askAI(`Summarize this week’s sales performance in 4-5 short bullet points: pipeline health, what’s progressing, what’s at risk, and the single most important action for the team.${repCtx}`);
+    const repCtx=selOwner?` Focus specifically on ${selOwner}'s performance.`:"";
+    try{ const t=await askAI(`Summarize this week's sales performance in 4-5 short bullet points: pipeline health, what's progressing, what's at risk, and the single most important action for the team.${repCtx}`);
       out.querySelector(".ic-body").textContent=t; }
     catch(e){ out.querySelector(".ic-body").textContent="⚠️ "+e.message; }
     btn.disabled=false;btn.innerHTML=`${I.spark}<span>Weekly AI summary</span>`;
@@ -1658,7 +1658,7 @@ function renderContactDetail(c,id){
         <div class="insight"><div class="ih">${I.spark}PulseAI insights</div><div class="ic-body" id="ai-body">Generate an AI summary and the next best action for this contact.</div>
           <div style="display:flex;gap:8px;margin-top:11px"><button class="btn sm" id="ai-sum">${I.spark}Summarize</button><button class="btn sm" id="ai-next">${I.flag}Next best action</button><button class="btn sm" id="ai-email">${I.mail}Draft follow-up</button></div></div>
         <div class="card panel"><div class="panel-head"><h2>Activity timeline</h2><div style="display:flex;gap:6px"><button class="btn ghost sm" id="logemail">${I.mail}Email</button><button class="btn ghost sm" id="loglinkedin">${I.linkedin}LinkedIn</button><button class="btn ghost sm" id="logcall">${I.phone}Call</button><button class="btn ghost sm" id="addnote">${I.note}Note</button></div></div>
-          <div class="timeline" id="tl">${acts.length?acts.map((a,i)=>tlItem(a,i,acts.length)).join(""):emptyMini("Nothing logged yet","Log a note, call, or email to build this contact’s history.")}</div></div>
+          <div class="timeline" id="tl">${acts.length?acts.map((a,i)=>tlItem(a,i,acts.length)).join(""):emptyMini("Nothing logged yet","Log a note, call, or email to build this contact's history.")}</div></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card panel"><div class="panel-head"><h2>Details</h2></div>
