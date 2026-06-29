@@ -88,20 +88,19 @@
   .me .info{min-width:0;flex:1;overflow:hidden;transition:opacity .15s,max-width .2s;max-width:200px;}
   .me .info .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .me .info .em{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .nav-collapse-btn{width:100%;border:none;background:transparent;color:var(--faint);cursor:pointer;padding:6px 8px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:flex-end;transition:background .14s,color .14s;margin-top:4px;}
+  .nav-collapse-btn{flex:none;border:none;background:transparent;color:var(--faint);cursor:pointer;padding:5px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;transition:background .14s,color .14s;margin-left:auto;}
   .nav-collapse-btn:hover{background:var(--surface-2);color:var(--ink);}
-  .nav-collapse-btn svg{width:15px;height:15px;flex:none;transition:transform .2s;}
+  .nav-collapse-btn svg{width:16px;height:16px;flex:none;transition:transform .2s;}
   /* collapsed sidebar — icon-only mode */
   .sidebar.collapsed{padding:18px 8px;}
   .sidebar.collapsed .brand b,.sidebar.collapsed .nav-sec,.sidebar.collapsed .nav button span,.sidebar.collapsed .me .info,.sidebar.collapsed [data-action=signout]{opacity:0;max-width:0;max-height:0;pointer-events:none;}
   .sidebar.collapsed .nav button{justify-content:center;padding:9px 0;}
-  .sidebar.collapsed .nav-collapse-btn{justify-content:center;}
   .sidebar.collapsed .nav-collapse-btn svg{transform:rotate(180deg);}
   .sidebar.collapsed .nav .badge{display:none;}
 
   .main{display:flex;flex-direction:column;min-width:0;}
   .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 26px;background:color-mix(in srgb,var(--canvas) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
-  .search{flex:1;max-width:440px;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 12px;color:var(--faint);font-size:13px;cursor:pointer;transition:border-color .14s;}
+  .search{flex:1;max-width:440px;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 12px;color:var(--faint);font-size:13px;cursor:pointer;transition:border-color .14s;white-space:nowrap;overflow:hidden;height:36px;box-sizing:border-box;}
   .search:hover{border-color:var(--accent);}
   .search svg{width:16px;height:16px;flex:none;}
   .search kbd{margin-left:auto;font-family:inherit;font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--muted);}
@@ -194,6 +193,12 @@
   .prio.high{background:var(--danger-soft);color:var(--danger);}
   .prio.medium{background:var(--warn-soft);color:var(--warn);}
   .prio.low{background:var(--surface-2);color:var(--muted);}
+  /* vertical kanban */
+  .board.vert{display:flex;flex-direction:column;overflow-x:visible;padding-bottom:0;}
+  .board.vert .kcol{flex-direction:row;flex-wrap:wrap;align-items:flex-start;min-height:auto;gap:9px;}
+  .board.vert .kcol-head{flex:none;width:132px;min-width:132px;flex-direction:column;align-items:flex-start;gap:4px;padding:4px 10px 4px 4px;border-right:2px solid var(--line);align-self:stretch;}
+  .board.vert .kcol-head .tot{margin-left:0;}
+  .board.vert .dealcard{width:200px;flex:none;}
 
   /* ---------- timeline ---------- */
   .timeline{display:flex;flex-direction:column;gap:2px;}
@@ -283,10 +288,12 @@
   .cmdk-in input{flex:1;border:none;background:none;font-size:15px;}
   .cmdk-in input:focus{outline:none;}
   .cmdk-results{max-height:54vh;overflow-y:auto;padding:8px;}
-  .cmdk-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--r-sm);cursor:pointer;font-size:13.5px;}
+  .cmdk-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--r-sm);cursor:pointer;font-size:13.5px;overflow:hidden;}
   .cmdk-item.sel,.cmdk-item:hover{background:var(--surface-2);}
   .cmdk-item .ic{width:30px;height:30px;border-radius:8px;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex:none;}
   .cmdk-item .ic svg{width:15px;height:15px;}
+  .cmdk-item>div{min-width:0;overflow:hidden;}
+  .cmdk-item>div>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .cmdk-item .sub{font-size:11.5px;color:var(--faint);}
   .cmdk-empty{padding:30px;text-align:center;color:var(--faint);font-size:13px;}
   .cmdk-grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600;padding:10px 12px 4px;}
@@ -318,6 +325,23 @@
   }
   .menu-toggle{display:none;}
   @media(max-width:760px){.menu-toggle{display:flex;}}
+
+  /* ---------- bulk upload modal ---------- */
+  .bulk-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadein .15s ease;}
+  .bulk-modal-box{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow-lg);width:min(680px,100%);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
+  .bulk-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--line);}
+  .bulk-head h2{font-size:16px;font-family:'Space Grotesk',sans-serif;}
+  .bulk-body{flex:1;overflow-y:auto;padding:20px;}
+  .bulk-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;}
+  .bulk-drop{border:2px dashed var(--line);border-radius:var(--r-sm);padding:28px 20px;text-align:center;position:relative;cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted);}
+  .bulk-drop:hover,.bulk-drop.dragover{border-color:var(--accent);background:var(--accent-soft);}
+  .bulk-drop svg{width:28px;height:28px;margin:0 auto;}
+  .bulk-steps{display:flex;gap:6px;margin-bottom:18px;font-size:12px;color:var(--faint);}
+  .bulk-steps .step{display:flex;align-items:center;gap:5px;}
+  .bulk-steps .step.on{color:var(--accent);font-weight:600;}
+  .bulk-steps .step-num{width:18px;height:18px;border-radius:50%;border:1.5px solid currentColor;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;}
+  .bulk-steps .step.on .step-num{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .bulk-steps .step-div{flex:1;height:1px;background:var(--line);margin:0 4px;}
 </style>
 </head>
 <body>
@@ -388,6 +412,9 @@ const I={
   trophy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
   clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
   alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  cols:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="18" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>',
+  rows:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="5" rx="1"/><rect x="3" y="10" width="18" height="5" rx="1"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>',
 };
 
 /* ---------------- state ---------------- */
@@ -519,12 +546,11 @@ function renderSidebar(){
   const collapsed=state.navCollapsed;
   $("#sidebar").className="sidebar"+(state.sideOpen?" show":"")+(collapsed?" collapsed":"");
   $("#sidebar").innerHTML=`
-    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>merchantsbi</b></div>
+    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>merchantsbi</b><button class="nav-collapse-btn" id="nav-collapse-btn" title="${collapsed?"Expand sidebar":"Collapse sidebar"}">${I.chevronLeft}</button></div>
     <nav class="nav">${nav}</nav>
     <div class="side-foot">
       <div class="me">${ava(u.name||u.email,30)}<div class="info"><div class="nm">${esc(u.name||"You")}</div><div class="em">${esc(u.email)}</div></div></div>
       <button class="btn ghost sm" style="width:100%;margin-top:6px;justify-content:center" data-action="signout">Sign out</button>
-      <button class="nav-collapse-btn" id="nav-collapse-btn" title="${collapsed?"Expand sidebar":"Collapse sidebar"}">${I.chevronLeft}</button>
     </div>
     <div class="nav-resize" id="nav-resize"></div>`;
   $("#sidebar").querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>{state.page=b.dataset.nav;state.detail=null;state.sideOpen=false;render();});
@@ -667,12 +693,36 @@ function renderDashboard(c){
 function actIcon(t){return {deal:I.dollar,contact:I.users,note:I.note,task:I.check,stage:I.trello,email:I.mail,meeting:I.clock}[t]||I.note;}
 function emptyMini(t,s){return `<div class="empty" style="padding:30px 16px"><h3>${esc(t)}</h3><p>${esc(s)}</p></div>`;}
 
+function downloadCSVTemplate(type){
+  let hdr,rows,fn;
+  if(type==="contacts"){
+    hdr=["first_name","last_name","email","phone","job_title","company_name","status","source","owner","tags","notes"];
+    rows=[
+      ["John","Smith","john@acme.com","555-123-4567","VP Sales","Acme Corp","Lead","Website","Jane Doe","enterprise,priority","Met at conference"],
+      ["Sara","Lee","sara@widgets.co","","Account Executive","Widgets Co","Qualified","Referral","","",""],
+    ];
+    fn="contacts_import_template.csv";
+  } else {
+    hdr=["company_name","website","industry","size","location","owner","notes"];
+    rows=[
+      ["Acme Corp","https://acme.com","SaaS","11-50","New York NY","Jane Doe","Main prospect"],
+      ["Widgets Co","","Manufacturing","51-200","Chicago IL","",""],
+    ];
+    fn="companies_import_template.csv";
+  }
+  const csvCell=v=>(v.includes(",")||v.includes('"')||v.includes("\n"))?`"${v.replace(/"/g,'""')}"`:v;
+  const csv=[hdr,...rows].map(r=>r.map(csvCell).join(",")).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download=fn;a.click();URL.revokeObjectURL(a.href);
+}
+
 /* ---------------- Contacts ---------------- */
 function renderContacts(c){
   const list=live(state.contacts).sort((a,b)=>b.updatedAt-a.updatedAt);
   c.innerHTML=`
     <div class="pagehead"><div><h1>Contacts</h1><div class="sub">${list.length} ${list.length===1?"person":"people"} in your CRM</div></div>
-      <button class="btn primary" id="newc">${I.plus}<span>New contact</span></button></div>
+      <div style="display:flex;gap:8px"><button class="btn" id="csv-contacts">${I.download}<span>CSV template</span></button><button class="btn" id="importc">${I.note}<span>Import CSV</span></button><button class="btn primary" id="newc">${I.plus}<span>New contact</span></button></div></div>
     <div class="toolbar"><div class="field-search">${I.search}<input id="csearch" placeholder="Search by name, email, company…"></div>
       <select class="input" id="cstatus"><option value="">All statuses</option>${["Lead","Qualified","Customer","Churned"].map(s=>`<option>${s}</option>`).join("")}</select></div>
     <div class="card tablecard" id="ctable"></div>`;
@@ -697,7 +747,8 @@ function renderContacts(c){
     $("#ctable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();contactForm(b.dataset.edit);});
     const n2=$("#newc2"); if(n2)n2.onclick=()=>contactForm();
   };
-  $("#csearch").oninput=draw; $("#cstatus").onchange=draw; $("#newc").onclick=()=>contactForm(); draw();
+  $("#csearch").oninput=draw; $("#cstatus").onchange=draw; $("#newc").onclick=()=>contactForm();
+  $("#csv-contacts").onclick=()=>downloadCSVTemplate("contacts"); $("#importc").onclick=()=>bulkUploadModal("contacts"); draw();
 }
 
 function renderContactDetail(c,id){
@@ -751,7 +802,7 @@ function renderCompanies(c){
   const list=live(state.companies).sort((a,b)=>b.updatedAt-a.updatedAt);
   c.innerHTML=`
     <div class="pagehead"><div><h1>Companies</h1><div class="sub">${list.length} ${list.length===1?"company":"companies"}</div></div>
-      <button class="btn primary" id="newco">${I.plus}<span>New company</span></button></div>
+      <div style="display:flex;gap:8px"><button class="btn" id="csv-companies">${I.download}<span>CSV template</span></button><button class="btn" id="importco">${I.note}<span>Import CSV</span></button><button class="btn primary" id="newco">${I.plus}<span>New company</span></button></div></div>
     <div class="toolbar"><div class="field-search">${I.search}<input id="cosearch" placeholder="Search companies…"></div></div>
     <div class="card tablecard" id="cotable"></div>`;
   const draw=()=>{
@@ -768,7 +819,8 @@ function renderCompanies(c){
     $("#cotable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();companyForm(b.dataset.edit);});
     const n2=$("#newco2");if(n2)n2.onclick=()=>companyForm();
   };
-  $("#cosearch").oninput=draw;$("#newco").onclick=()=>companyForm();draw();
+  $("#cosearch").oninput=draw;$("#newco").onclick=()=>companyForm();
+  $("#csv-companies").onclick=()=>downloadCSVTemplate("companies");$("#importco").onclick=()=>bulkUploadModal("companies");draw();
 }
 function renderCompanyDetail(c,id){
   const x=companyById(id); if(!x){state.detail=null;return renderCompanies(c);}
@@ -786,8 +838,8 @@ function renderCompanyDetail(c,id){
       <div class="card stat"><div class="lbl">Total deals</div><div class="val">${deals.length}</div></div>
     </div>
     <div class="grid2">
-      <div class="card panel"><div class="panel-head"><h2>Contacts</h2></div>
-        ${cts.length?cts.map(p=>`<div class="cellname" data-c="${p.id}" style="padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer">${ava(contactName(p),26)}<div><div style="font-size:13px;font-weight:600">${esc(contactName(p))}</div><div class="faint" style="font-size:11.5px">${esc(p.title||p.email||"")}</div></div></div>`).join(""):emptyMini("No contacts","Assign contacts to this company.")}</div>
+      <div class="card panel"><div class="panel-head"><h2>Contacts</h2><button class="btn sm" id="addcontact">${I.plus}Add contact</button></div>
+        ${cts.length?cts.map(p=>`<div class="cellname" data-c="${p.id}" style="padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer">${ava(contactName(p),26)}<div><div style="font-size:13px;font-weight:600">${esc(contactName(p))}</div><div class="faint" style="font-size:11.5px">${esc(p.title||p.email||"")}</div></div></div>`).join(""):emptyMini("No contacts","Add contacts to this company.")}</div>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card panel"><div class="panel-head"><h2>Deals</h2></div>
           ${deals.length?deals.map(d=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)"><div><div style="font-weight:600;font-size:13px">${esc(d.name)}</div><div class="faint" style="font-size:11.5px">${esc(d.stage)}</div></div><div style="font-weight:600;font-size:13px">${money(d.value)}</div></div>`).join(""):emptyMini("No deals","Create a deal for this company.")}</div>
@@ -797,17 +849,22 @@ function renderCompanyDetail(c,id){
   $("#back").onclick=()=>{state.detail=null;render();};
   $("#edit").onclick=()=>companyForm(id);
   $("#del").onclick=()=>confirmDelete("company",id,x.name,()=>{state.detail=null;render();});
+  $("#addcontact").onclick=()=>contactForm(null,{companyId:id});
   c.querySelectorAll("[data-c]").forEach(el=>el.onclick=()=>{state.detail={type:"contact",id:el.dataset.c};render();});
 }
 
 /* ---------------- Deals / Pipeline (kanban) ---------------- */
 function renderDeals(c){
+  if(!state._pipeOri)state._pipeOri=localStorage.getItem("pulse-pipe-ori")||"h";
+  const ori=state._pipeOri;
   const D=live(state.deals);
   const open=D.filter(d=>d.stage!=="Won"&&d.stage!=="Lost");
   c.innerHTML=`
     <div class="pagehead"><div><h1>Pipeline</h1><div class="sub">${open.length} open deals · ${moneyK(open.reduce((s,d)=>s+(+d.value||0),0))} in play</div></div>
-      <button class="btn primary" id="newd">${I.plus}<span>New deal</span></button></div>
-    <div class="board" id="board"></div>`;
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;gap:2px"><button class="btn sm${ori==="h"?" primary":""}" id="ori-h" title="Columns layout" style="padding:5px 8px">${I.cols}</button><button class="btn sm${ori==="v"?" primary":""}" id="ori-v" title="Rows layout" style="padding:5px 8px">${I.rows}</button></div>
+        <button class="btn primary" id="newd">${I.plus}<span>New deal</span></button></div></div>
+    <div class="board${ori==="v"?" vert":""}" id="board"></div>`;
   const board=$("#board");
   board.innerHTML=STAGES.map(s=>{
     const items=D.filter(d=>d.stage===s).sort((a,b)=>(a.order||0)-(b.order||0));
@@ -833,6 +890,8 @@ function renderDeals(c){
     };
   });
   $("#newd").onclick=()=>dealForm();
+  $("#ori-h").onclick=()=>{state._pipeOri="h";try{localStorage.setItem("pulse-pipe-ori","h");}catch(_){}renderDeals(c);};
+  $("#ori-v").onclick=()=>{state._pipeOri="v";try{localStorage.setItem("pulse-pipe-ori","v");}catch(_){}renderDeals(c);};
 }
 function dealCard(d){
   const co=companyById(d.companyId);
@@ -950,12 +1009,17 @@ function renderSettings(c){
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Slack","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div>
         <div class="card panel"><div class="panel-head"><h2>Data</h2></div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">${fbReady?"Connected to Firestore — changes persist in real time.":"Demo mode — configure Firebase in index.html to persist data."}</div>
-          ${!live(state.contacts).length?`<button class="btn" id="seeddemo">${I.spark}Load sample data</button>`:""}</div>
+          ${!live(state.contacts).length?`<button class="btn" id="seeddemo">${I.spark}Load sample data</button>`:""}
+          <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><div style="font-size:13px;font-weight:600;margin-bottom:8px">Bulk import templates</div>
+          <div class="faint" style="font-size:12px;margin-bottom:10px">Download a CSV template, fill in your data, and use it when bulk import launches.</div>
+          <div style="display:flex;gap:8px"><button class="btn" id="dl-contacts-tmpl">${I.download}Contacts CSV</button><button class="btn" id="dl-companies-tmpl">${I.download}Companies CSV</button></div></div></div>
       </div>
     </div>`;
   c.querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{state.theme=b.dataset.themeSet;localStorage.setItem("pulse-theme",state.theme);render();});
   $("#addmember").onclick=()=>memberForm();
   const sd=$("#seeddemo");if(sd)sd.onclick=()=>{seedDemo();toast("Sample data loaded","ok");};
+  $("#dl-contacts-tmpl").onclick=()=>downloadCSVTemplate("contacts");
+  $("#dl-companies-tmpl").onclick=()=>downloadCSVTemplate("companies");
 }
 
 /* ---------------- empty state ---------------- */
@@ -988,8 +1052,8 @@ function field(id,label,opts={}){
 const companyOptions=()=>[{v:"",l:"— None —"},...live(state.companies).map(c=>({v:c.id,l:c.name}))];
 const memberOptions=()=>{const names=[...new Set([...(state.members.map(m=>m.name)),state.user?.name].filter(Boolean))];return [{v:"",l:"— Unassigned —"},...names.map(n=>({v:n,l:n}))];};
 
-function contactForm(id){
-  const x=id?contactById(id):{};
+function contactForm(id, defaults={}){
+  const x=id?contactById(id):defaults;
   const body=`<div class="field-row">${field("c_first","First name",{value:x.firstName})}${field("c_last","Last name",{value:x.lastName})}</div>
     ${field("c_email","Email",{value:x.email,type:"email",ph:"name@company.com"})}
     <div class="field-row">${field("c_phone","Phone",{value:x.phone})}${field("c_title","Job title",{value:x.title})}</div>
@@ -1273,6 +1337,209 @@ function seedDemo(){
     {id:"a4",type:"deal",text:"Created deal “Harbor Financial — New logo” ($32,000)",actor:"Nathan Mosseri",relatedType:"deal",relatedId:"d6",createdAt:now-3*DAY,deletedAt:null},
   ];
   localSeq=100;
+}
+
+/* ====================================================================
+   BULK UPLOAD (CSV import for contacts & companies)
+==================================================================== */
+function parseCsv(text){
+  const rows=[];
+  text=text.replace(/\r\n?/g,"\n").trim();
+  if(!text)return rows;
+  let cur=[],field="",inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){if(c==='"'&&text[i+1]==='"'){field+='"';i++;}else if(c==='"')inQ=false;else field+=c;}
+    else if(c==='"'){inQ=true;}
+    else if(c===","){cur.push(field);field="";}
+    else if(c==="\n"){cur.push(field);rows.push(cur);cur=[];field="";}
+    else field+=c;
+  }
+  cur.push(field);
+  if(cur.some(x=>x.trim()))rows.push(cur);
+  return rows;
+}
+
+function bulkUploadModal(type){
+  const isCon=type==="contacts";
+  const TEMPLATE_HEADERS=isCon
+    ?["firstName","lastName","email","phone","title","company","status","source","tags","notes"]
+    :["name","website","industry","size","location","notes"];
+  const PREVIEW_COLS=isCon
+    ?["firstName","lastName","email","title","_companyName","status"]
+    :["name","industry","size","location","website"];
+  const PREVIEW_LABELS=isCon
+    ?["First","Last","Email","Title","Company","Status"]
+    :["Name","Industry","Size","Location","Website"];
+
+  // flexible header normalizer: strip spaces/underscores, lowercase
+  const norm=s=>String(s||"").toLowerCase().replace(/[\s_-]+/g,"");
+  const HEADER_ALIASES=isCon?{
+    firstname:["firstname","first","givenname"],
+    lastname:["lastname","last","surname","familyname"],
+    email:["email","emailaddress","mail"],
+    phone:["phone","phonenumber","mobile","cell","telephone"],
+    title:["title","jobtitle","role","position"],
+    company:["company","companyname","organization","org","account"],
+    status:["status","leadstatus","type"],
+    source:["source","leadsource","origin"],
+    tags:["tags","tag","labels"],
+    notes:["notes","note","description","comment","comments"]
+  }:{
+    name:["name","companyname","company","organization","org"],
+    website:["website","url","web","domain"],
+    industry:["industry","sector","vertical"],
+    size:["size","companysize","employees","headcount"],
+    location:["location","city","address","hq","headquarters"],
+    notes:["notes","note","description"]
+  };
+
+  const resolveHeaders=rawHeaders=>{
+    const normed=rawHeaders.map(norm);
+    const map={};
+    Object.entries(HEADER_ALIASES).forEach(([field,aliases])=>{
+      const i=normed.findIndex(h=>aliases.includes(h));
+      if(i>=0)map[field]=i;
+    });
+    return map;
+  };
+
+  const overlay=document.createElement("div");
+  overlay.className="bulk-modal";
+  overlay.id="bulkmodal";
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.onclick=e=>{if(e.target===overlay)close();};
+
+  const steps=(active)=>`<div class="bulk-steps">
+    <div class="step ${active===1?"on":""}"><span class="step-num">1</span>Upload</div>
+    <div class="step-div"></div>
+    <div class="step ${active===2?"on":""}"><span class="step-num">2</span>Preview</div>
+    <div class="step-div"></div>
+    <div class="step ${active===3?"on":""}"><span class="step-num">3</span>Done</div>
+  </div>`;
+
+  const label=isCon?"contacts":"companies";
+  const templateCsv=TEMPLATE_HEADERS.join(",")+"\n";
+  const templateUrl="data:text/csv;charset=utf-8,"+encodeURIComponent(templateCsv);
+
+  // ---- Step 1: upload ----
+  const step1=()=>{
+    overlay.innerHTML=`<div class="bulk-modal-box">
+      <div class="bulk-head"><h2>Import ${isCon?"Contacts":"Companies"}</h2><button class="iconbtn" id="bkX">${I.x}</button></div>
+      <div class="bulk-body">
+        ${steps(1)}
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">Upload a .csv file or paste CSV text below. Columns are matched flexibly — use the template if unsure. <a href="${templateUrl}" download="${label}_template.csv" style="color:var(--accent)">Download template</a></p>
+        <div class="bulk-drop" id="bkDrop">
+          ${I.note}
+          <div style="font-weight:500;margin-top:10px">Drop a .csv file here or click to browse</div>
+          <div style="font-size:12px;color:var(--faint);margin-top:4px">Expected columns: ${TEMPLATE_HEADERS.join(", ")}</div>
+          <input type="file" id="bkFile" accept=".csv,text/csv" style="position:absolute;inset:0;opacity:0;cursor:pointer">
+        </div>
+        <div style="margin-top:14px">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">Or paste CSV:</label>
+          <textarea id="bkPaste" rows="7" placeholder="${TEMPLATE_HEADERS.join(",")}\n..." style="width:100%;font-family:monospace;font-size:12px;padding:10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink);resize:vertical"></textarea>
+        </div>
+      </div>
+      <div class="bulk-foot"><button class="btn" id="bkCancel">Cancel</button><button class="btn primary" id="bkNext">Preview →</button></div>
+    </div>`;
+    overlay.querySelector("#bkX").onclick=close;
+    overlay.querySelector("#bkCancel").onclick=close;
+    const fileInput=overlay.querySelector("#bkFile");
+    const pasteArea=overlay.querySelector("#bkPaste");
+    fileInput.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{pasteArea.value=ev.target.result;};r.readAsText(f);};
+    const drop=overlay.querySelector("#bkDrop");
+    drop.ondragover=e=>{e.preventDefault();drop.classList.add("dragover");};
+    drop.ondragleave=()=>drop.classList.remove("dragover");
+    drop.ondrop=e=>{e.preventDefault();drop.classList.remove("dragover");const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>{pasteArea.value=ev.target.result;};r.readAsText(f);}};
+    overlay.querySelector("#bkNext").onclick=()=>{
+      const text=pasteArea.value.trim();
+      if(!text){toast("Paste CSV or upload a file first","err");return;}
+      const rows=parseCsv(text);
+      if(rows.length<2){toast("Need at least a header row and one data row","err");return;}
+      step2(rows);
+    };
+  };
+
+  // ---- Step 2: preview ----
+  const step2=(rows)=>{
+    const rawHeaders=rows[0];
+    const dataRows=rows.slice(1).filter(r=>r.some(c=>c.trim()));
+    if(!dataRows.length){toast("No data rows found in CSV","err");step1();return;}
+    const hmap=resolveHeaders(rawHeaders);
+    const get=(r,field)=>{const i=hmap[field];return(i!=null&&r[i]!=null)?r[i].trim():"";};
+
+    const errors=[];
+    const mapped=dataRows.map((r,i)=>{
+      if(isCon){
+        const fn=get(r,"firstname"),ln=get(r,"lastname");
+        if(!fn&&!ln){errors.push("Row "+(i+2)+": name required (firstName/lastName)");return null;}
+        return{firstName:fn,lastName:ln,email:get(r,"email"),phone:get(r,"phone"),title:get(r,"title"),
+          _companyName:get(r,"company"),status:get(r,"status")||"Lead",source:get(r,"source"),
+          tags:get(r,"tags").split(",").map(t=>t.trim()).filter(Boolean),notes:get(r,"notes")};
+      } else {
+        const nm=get(r,"name");
+        if(!nm){errors.push("Row "+(i+2)+": company name required");return null;}
+        return{name:nm,website:get(r,"website"),industry:get(r,"industry"),size:get(r,"size"),location:get(r,"location"),notes:get(r,"notes")};
+      }
+    }).filter(Boolean);
+
+    const rowCount=mapped.length;
+    const errWarn=errors.length?`<div style="background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:var(--r-sm);padding:10px 14px;font-size:12.5px;color:var(--warn);margin-bottom:12px">${errors.length} row(s) skipped — ${errors.slice(0,3).map(esc).join("; ")}${errors.length>3?` (+${errors.length-3} more)`:""}</div>`:"";
+
+    const tableRows=mapped.slice(0,100).map(r=>`<tr style="border-bottom:1px solid var(--line)">${PREVIEW_COLS.map(col=>`<td style="padding:6px 10px;font-size:12px;color:var(--muted);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis">${esc(r[col]||"")}</td>`).join("")}</tr>`).join("");
+    const moreRow=mapped.length>100?`<tr><td colspan="${PREVIEW_COLS.length}" style="padding:8px 10px;font-size:11.5px;color:var(--faint)">…and ${mapped.length-100} more rows</td></tr>`:"";
+
+    overlay.innerHTML=`<div class="bulk-modal-box">
+      <div class="bulk-head"><h2>Preview — ${rowCount} ${label} ready to import</h2><button class="iconbtn" id="bkX">${I.x}</button></div>
+      <div class="bulk-body">
+        ${steps(2)}
+        ${errWarn}
+        ${rowCount===0?`<div style="text-align:center;padding:30px;color:var(--faint)">No valid rows to import.</div>`:`
+        <div style="overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--r-sm)">
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead style="position:sticky;top:0;background:var(--surface);z-index:1">
+              <tr>${PREVIEW_LABELS.map(l=>`<th style="text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-weight:600;white-space:nowrap;font-size:12px">${esc(l)}</th>`).join("")}</tr>
+            </thead>
+            <tbody>${tableRows}${moreRow}</tbody>
+          </table>
+        </div>`}
+      </div>
+      <div class="bulk-foot">
+        <button class="btn" id="bkBack">← Back</button>
+        <button class="btn primary" id="bkImport" ${rowCount===0?"disabled":""}>Import ${rowCount} ${isCon?"contact":(rowCount===1?"company":"companies")}${isCon&&rowCount!==1?"s":""}</button>
+      </div>
+    </div>`;
+    overlay.querySelector("#bkX").onclick=close;
+    overlay.querySelector("#bkBack").onclick=()=>{overlay.innerHTML="";step1();};
+    if(rowCount>0){
+      overlay.querySelector("#bkImport").onclick=async()=>{
+        const btn=overlay.querySelector("#bkImport");
+        btn.disabled=true;btn.innerHTML=`<span class="spin"></span> Importing…`;
+        let ok=0,fail=0;
+        for(const row of mapped){
+          try{
+            let data;
+            if(isCon){
+              let companyId=null;
+              if(row._companyName){const co=live(state.companies).find(c=>c.name.toLowerCase()===row._companyName.toLowerCase());companyId=co?co.id:null;}
+              data={firstName:row.firstName,lastName:row.lastName,email:row.email,phone:row.phone,title:row.title,
+                companyId,status:row.status,source:row.source,tags:row.tags,notes:row.notes};
+            } else {
+              data={name:row.name,website:row.website,industry:row.industry,size:row.size,location:row.location,notes:row.notes};
+            }
+            await dbAdd(type,data,true);
+            ok++;
+          }catch(e){fail++;}
+        }
+        toast(`Imported ${ok} ${label}${fail?` (${fail} failed)`:""}`,ok>0?"ok":"err");
+        if(ok>0)logActivity("contact",`Bulk imported ${ok} ${label}`,"","");
+        close();render();
+      };
+    }
+  };
+
+  step1();
 }
 </script>
 </body>
