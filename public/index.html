@@ -1013,7 +1013,7 @@ function renderSettings(c){
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Slack","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div>
         <div class="card panel"><div class="panel-head"><h2>Data</h2></div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">${fbReady?"Connected to Firestore — changes persist in real time.":"Demo mode — configure Firebase in index.html to persist data."}</div>
-          ${!live(state.contacts).length?`<button class="btn" id="seedbtn">${I.spark}Seed 500 contacts, 75 companies &amp; 90 deals</button>`:""}
+          <button class="btn" id="seedbtn">${I.spark}${live(state.contacts).length?"Re-seed 500 contacts, 75 companies &amp; 90 deals":"Seed 500 contacts, 75 companies &amp; 90 deals"}</button>
           <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><div style="font-size:13px;font-weight:600;margin-bottom:8px">Bulk import templates</div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">Download a CSV template, fill in your data, and use it when bulk import launches.</div>
           <div style="display:flex;gap:8px"><button class="btn" id="dl-contacts-tmpl">${I.download}Contacts CSV</button><button class="btn" id="dl-companies-tmpl">${I.download}Companies CSV</button></div></div></div>
