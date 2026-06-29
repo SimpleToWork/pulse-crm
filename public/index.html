@@ -239,6 +239,10 @@
   .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);}
   .field textarea{resize:vertical;min-height:70px;}
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .field-checks{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px;}
+  .field-check-item{position:absolute;opacity:0;pointer-events:none;width:0;height:0;}
+  .field-check-item + label{font-size:11.5px;font-weight:500;padding:4px 10px;border-radius:20px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line);cursor:pointer;transition:background .12s,color .12s,border-color .12s;user-select:none;}
+  .field-check-item:checked + label{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent);}
 
   /* detail header */
   .detail-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;}
@@ -384,6 +388,7 @@ const STAGE_COLOR={"New Lead":"#94a3b8","Contacted":"#5b5bf0","Qualified":"#0ea5
 const STAGE_PROB={"New Lead":10,"Contacted":25,"Qualified":45,"Proposal Sent":65,"Negotiation":80,"Won":100,"Lost":0};
 const STATUS_COLOR={"Lead":"#94a3b8","Qualified":"#0ea5e9","Customer":"#16a34a","Churned":"#dc2626"};
 const PRIORITIES=["low","medium","high"];
+const DATA_SOURCES=["Website","Referral","Cold Outreach","Event","LinkedIn","Email Campaign","Partner","Trade Show","Social Media","Inbound Call","Other"];
 const AVA_COLORS=["#5b5bf0","#8b5cf6","#0ea5e9","#16a34a","#f59e0b","#dc2626","#db2777","#0d9488"];
 
 /* ---------------- icons (lucide-style inline) ---------------- */
@@ -485,8 +490,8 @@ function workspaceContext(){
   return [
     `PulseCRM workspace snapshot (the ONLY data you may use):`,
     `Contacts (${C.length}): `+C.slice(0,40).map(c=>`${contactName(c)} [${c.status||"Lead"}] ${companyById(c.companyId)?.name||""}`).join("; "),
-    `Companies (${Co.length}): `+Co.slice(0,25).map(c=>c.name+(c.industry?` (${c.industry})`:"")).join("; "),
-    `Open deals (${open.length}): `+open.slice(0,40).map(d=>`"${d.name}" ${money(d.value)} @ ${d.stage} (${companyById(d.companyId)?.name||"?"}) prio:${d.priority||"med"} close:${fmtDate(d.expectedClose)}`).join("; "),
+    `Companies (${Co.length}): `+Co.slice(0,25).map(c=>c.name+(c.industry?` (${c.industry})`:"")+( c.expectedClose?` close:${fmtDate(c.expectedClose)}`:""  )).join("; "),
+    `Open deals (${open.length}): `+open.slice(0,40).map(d=>`"${d.name}" ${money(d.value)} @ ${d.stage} (${companyById(d.companyId)?.name||"?"}) prio:${d.priority||"med"} close:${fmtDate(d.expectedClose)}${d.renewalDate?" renewal:"+fmtDate(d.renewalDate):""}`).join("; "),
     `Open tasks (${T.filter(t=>t.status!=="done").length}): `+T.filter(t=>t.status!=="done").slice(0,30).map(t=>`${t.title} (due ${fmtDate(t.due)})`).join("; "),
   ].join("\n");
 }
@@ -845,15 +850,16 @@ function renderCompanyDetail(c,id){
       <div class="card panel"><div class="panel-head"><h2>Contacts</h2><button class="btn sm" id="addcontact">${I.plus}Add contact</button></div>
         ${cts.length?cts.map(p=>`<div class="cellname" data-c="${p.id}" style="padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer">${ava(contactName(p),26)}<div><div style="font-size:13px;font-weight:600">${esc(contactName(p))}</div><div class="faint" style="font-size:11.5px">${esc(p.title||p.email||"")}</div></div></div>`).join(""):emptyMini("No contacts","Add contacts to this company.")}</div>
       <div style="display:flex;flex-direction:column;gap:14px">
-        <div class="card panel"><div class="panel-head"><h2>Deals</h2></div>
+        <div class="card panel"><div class="panel-head"><h2>Deals</h2><button class="btn sm" id="adddeal">${I.plus}Add deal</button></div>
           ${deals.length?deals.map(d=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)"><div><div style="font-weight:600;font-size:13px">${esc(d.name)}</div><div class="faint" style="font-size:11.5px">${esc(d.stage)}</div></div><div style="font-weight:600;font-size:13px">${money(d.value)}</div></div>`).join(""):emptyMini("No deals","Create a deal for this company.")}</div>
-        <div class="card panel"><dl class="kv"><dt>Size</dt><dd>${esc(x.size||"—")}</dd><dt>Location</dt><dd>${esc(x.location||"—")}</dd><dt>Owner</dt><dd>${esc(x.owner||"—")}</dd></dl>${x.notes?`<div style="margin-top:12px;font-size:13px;white-space:pre-wrap">${esc(x.notes)}</div>`:""}</div>
+        <div class="card panel"><dl class="kv"><dt>Size</dt><dd>${esc(x.size||"—")}</dd><dt>Location</dt><dd>${esc(x.location||"—")}</dd><dt>Expected close</dt><dd>${x.expectedClose?fmtDate(x.expectedClose):"—"}</dd><dt>Owner</dt><dd>${esc(x.owner||"—")}</dd></dl>${(x.dataSources||[]).length?`<div style="margin-top:10px"><div style="font-size:11px;color:var(--faint);font-weight:500;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Data Sources</div><div style="display:flex;flex-wrap:wrap;gap:5px">${(x.dataSources||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join("")}</div></div>`:""} ${x.notes?`<div style="margin-top:12px;font-size:13px;white-space:pre-wrap">${esc(x.notes)}</div>`:""}</div>
       </div>
     </div>`;
   $("#back").onclick=()=>{state.detail=null;render();};
   $("#edit").onclick=()=>companyForm(id);
   $("#del").onclick=()=>confirmDelete("company",id,x.name,()=>{state.detail=null;render();});
   $("#addcontact").onclick=()=>contactForm(null,{companyId:id});
+  $("#adddeal").onclick=()=>dealForm(null,{companyId:id});
   c.querySelectorAll("[data-c]").forEach(el=>el.onclick=()=>{state.detail={type:"contact",id:el.dataset.c};render();});
 }
 
@@ -903,7 +909,8 @@ function dealCard(d){
     <div class="dn">${esc(d.name)}</div>
     ${co?`<div class="dco">${esc(co.name)}</div>`:""}
     <div class="dfoot"><span class="dval">${money(d.value)}</span><span class="prio ${d.priority||"low"}">${esc(d.priority||"low")}</span></div>
-    ${d.expectedClose?`<div class="faint" style="font-size:11px">Close ${fmtDate(d.expectedClose)}</div>`:""}</div>`;
+    ${d.expectedClose?`<div class="faint" style="font-size:11px">Close ${fmtDate(d.expectedClose)}</div>`:""}
+    ${d.renewalDate?`<div class="faint" style="font-size:11px">Renewal ${fmtDate(d.renewalDate)}</div>`:""}</div>`;
 }
 
 /* ---------------- Tasks ---------------- */
@@ -1053,54 +1060,99 @@ function field(id,label,opts={}){
   if(opts.type==="textarea")return `<div class="field"><label>${esc(label)}</label><textarea id="${id}" placeholder="${esc(opts.ph||"")}">${esc(v)}</textarea></div>`;
   return `<div class="field"><label>${esc(label)}</label><input id="${id}" type="${opts.type||"text"}" placeholder="${esc(opts.ph||"")}" value="${esc(v)}"></div>`;
 }
+function multiCheckField(name,label,options,selected=[]){
+  const sel=Array.isArray(selected)?selected:[];
+  return `<div class="field"><label>${esc(label)}</label><div class="field-checks">${options.map(o=>{const uid=name+"_"+o.replace(/\W+/g,"_");return `<input type="checkbox" class="field-check-item" id="${uid}" name="${name}" value="${esc(o)}"${sel.includes(o)?" checked":""}><label for="${uid}">${esc(o)}</label>`;}).join("")}</div></div>`;
+}
+const multiVals=name=>Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(e=>e.value);
 const companyOptions=()=>[{v:"",l:"— None —"},...live(state.companies).map(c=>({v:c.id,l:c.name}))];
 const memberOptions=()=>{const names=[...new Set([...(state.members.map(m=>m.name)),state.user?.name].filter(Boolean))];return [{v:"",l:"— Unassigned —"},...names.map(n=>({v:n,l:n}))];};
 
 function contactForm(id, defaults={}){
   const x=id?contactById(id):defaults;
+  const coSelect=`<select id="c_company">${companyOptions().map(o=>`<option value="${esc(o.v)}" ${o.v==(x.companyId||"")?"selected":""}>${esc(o.l)}</option>`).join("")}</select>`;
+  const companyField=!id
+    ?`<div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Company<button type="button" id="c_newco_toggle" class="btn sm" style="font-size:11px;padding:2px 8px">＋ New</button></label>${coSelect}</div>
+      <div id="c_newco_section" style="display:none;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;margin-top:-6px;margin-bottom:2px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">New company</div>
+        ${field("c_newco_name","Company name",{ph:"Acme Inc"})}
+      </div>`
+    :field("c_company","Company",{type:"select",value:x.companyId,options:companyOptions()});
   const body=`<div class="field-row">${field("c_first","First name",{value:x.firstName})}${field("c_last","Last name",{value:x.lastName})}</div>
     ${field("c_email","Email",{value:x.email,type:"email",ph:"name@company.com"})}
     <div class="field-row">${field("c_phone","Phone",{value:x.phone})}${field("c_title","Job title",{value:x.title})}</div>
-    <div class="field-row">${field("c_company","Company",{type:"select",value:x.companyId,options:companyOptions()})}${field("c_status","Status",{type:"select",value:x.status||"Lead",options:["Lead","Qualified","Customer","Churned"]})}</div>
+    <div class="field-row">${companyField}${field("c_status","Status",{type:"select",value:x.status||"Lead",options:["Lead","Qualified","Customer","Churned"]})}</div>
     <div class="field-row">${field("c_source","Lead source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}${field("c_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
     ${field("c_tags","Tags (comma separated)",{value:(x.tags||[]).join(", ")})}
     ${field("c_notes","Notes",{type:"textarea",value:x.notes})}`;
   openDrawer(id?"Edit contact":"New contact",body,async()=>{
+    let companyId=val("c_company")||null;
+    if(!id){
+      const newCoName=val("c_newco_name");
+      if(newCoName){const coId=await dbAdd("companies",{name:newCoName,owner:state.user?.name||""},true);companyId=coId;}
+    }
     const data={firstName:val("c_first"),lastName:val("c_last"),email:val("c_email"),phone:val("c_phone"),title:val("c_title"),
-      companyId:val("c_company")||null,status:val("c_status"),source:val("c_source"),owner:val("c_owner"),
+      companyId,status:val("c_status"),source:val("c_source"),owner:val("c_owner"),
       tags:val("c_tags").split(",").map(t=>t.trim()).filter(Boolean),notes:val("c_notes")};
     if(!data.firstName&&!data.lastName){toast("Name is required","err");return false;}
     if(id){await dbUpdate("contacts",id,data);}else{const nid=await dbAdd("contacts",data);logActivity("contact",`Added contact ${data.firstName} ${data.lastName}`,"contact",nid);}
   });
+  if(!id)setTimeout(()=>{
+    const btn=document.getElementById("c_newco_toggle"),sec=document.getElementById("c_newco_section"),sel=document.getElementById("c_company");
+    if(btn&&sec&&sel)btn.onclick=()=>{const show=sec.style.display==="none";sec.style.display=show?"block":"none";btn.textContent=show?"✕ Cancel":"＋ New";sel.disabled=show;if(show){const inp=sec.querySelector("input");if(inp)inp.focus();}};
+  },50);
 }
 function companyForm(id){
   const x=id?companyById(id):{};
+  const newContactSection=!id?`<div style="margin-top:10px">
+    <button type="button" id="co_newc_toggle" class="btn sm" style="width:100%;justify-content:center">＋ Add a contact for this company</button>
+    <div id="co_newc_section" style="display:none;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;margin-top:8px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">New contact</div>
+      <div class="field-row">${field("co_c_first","First name",{})}${field("co_c_last","Last name",{})}</div>
+      ${field("co_c_email","Email",{type:"email",ph:"name@company.com"})}
+      ${field("co_c_title","Job title",{})}
+    </div>
+  </div>`:"";
   const body=`${field("co_name","Company name",{value:x.name})}
     <div class="field-row">${field("co_web","Website",{value:x.website,ph:"https://"})}${field("co_ind","Industry",{value:x.industry})}</div>
     <div class="field-row">${field("co_size","Size",{type:"select",value:x.size||"",options:["","1-10","11-50","51-200","201-500","500+"]})}${field("co_loc","Location",{value:x.location})}</div>
-    ${field("co_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}
-    ${field("co_notes","Notes",{type:"textarea",value:x.notes})}`;
+    <div class="field-row">${field("co_close","Expected close date",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}${field("co_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
+    ${multiCheckField("co_datasources","Data Sources",DATA_SOURCES,x.dataSources)}
+    ${field("co_notes","Notes",{type:"textarea",value:x.notes})}
+    ${newContactSection}`;
   openDrawer(id?"Edit company":"New company",body,async()=>{
-    const data={name:val("co_name"),website:val("co_web"),industry:val("co_ind"),size:val("co_size"),location:val("co_loc"),owner:val("co_owner"),notes:val("co_notes")};
+    const data={name:val("co_name"),website:val("co_web"),industry:val("co_ind"),size:val("co_size"),location:val("co_loc"),expectedClose:val("co_close")?new Date(val("co_close")).getTime():null,owner:val("co_owner"),dataSources:multiVals("co_datasources"),notes:val("co_notes")};
     if(!data.name){toast("Company name is required","err");return false;}
-    if(id){await dbUpdate("companies",id,data);}else{await dbAdd("companies",data);}
+    if(id){await dbUpdate("companies",id,data);}
+    else{
+      const coId=await dbAdd("companies",data);
+      const fName=val("co_c_first"),lName=val("co_c_last");
+      if(fName||lName){const nid=await dbAdd("contacts",{firstName:fName,lastName:lName,email:val("co_c_email"),title:val("co_c_title"),companyId:coId,status:"Lead",owner:data.owner,tags:[],notes:""},true);logActivity("contact",`Added contact ${fName} ${lName}`,"contact",nid);}
+    }
   });
+  if(!id)setTimeout(()=>{
+    const btn=document.getElementById("co_newc_toggle"),sec=document.getElementById("co_newc_section");
+    if(btn&&sec)btn.onclick=()=>{const show=sec.style.display==="none";sec.style.display=show?"block":"none";btn.textContent=show?"✕ Cancel":"＋ Add a contact for this company";if(show){const inp=sec.querySelector("input");if(inp)inp.focus();}};
+  },50);
 }
-function dealForm(id){
-  const x=id?state.deals.find(d=>d.id===id):{};
+function dealForm(id,defaults={}){
+  const x=id?state.deals.find(d=>d.id===id):defaults;
   const contactOpts=[{v:"",l:"— None —"},...live(state.contacts).map(c=>({v:c.id,l:contactName(c)}))];
   const body=`${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
     <div class="field-row">${field("d_value","Value (USD)",{value:x.value,type:"number"})}${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:STAGES})}</div>
     <div class="field-row">${field("d_company","Company",{type:"select",value:x.companyId,options:companyOptions()})}${field("d_contact","Primary contact",{type:"select",value:x.contactId,options:contactOpts})}</div>
     <div class="field-row">${field("d_prio","Priority",{type:"select",value:x.priority||"medium",options:PRIORITIES})}${field("d_close","Expected close",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}</div>
-    <div class="field-row">${field("d_source","Source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}${field("d_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
+    <div class="field-row">${field("d_renewal","Renewal date",{type:"date",value:x.renewalDate?new Date(x.renewalDate).toISOString().slice(0,10):""})}${field("d_source","Source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}</div>
+    <div class="field-row">${field("d_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
+    ${multiCheckField("d_datasources","Data Sources",DATA_SOURCES,x.dataSources)}
     ${field("d_notes","Notes",{type:"textarea",value:x.notes})}
     ${id?`<div class="insight" style="margin-top:6px"><div class="ih">${I.spark}PulseAI</div><div class="ic-body" id="d-ai">Get an AI risk read and the suggested next step for this deal.</div><div style="margin-top:10px;display:flex;gap:8px"><button type="button" class="btn sm" id="d-ai-next">${I.flag}Next step</button><button type="button" class="btn sm" id="d-ai-risk">${I.alert}Risk score</button></div></div>`:""}`;
   openDrawer(id?"Edit deal":"New deal",body,async()=>{
     const stage=val("d_stage");
     const data={name:val("d_name"),value:+val("d_value")||0,stage,companyId:val("d_company")||null,contactId:val("d_contact")||null,
-      priority:val("d_prio"),source:val("d_source"),owner:val("d_owner"),notes:val("d_notes"),probability:STAGE_PROB[stage],
-      expectedClose:val("d_close")?new Date(val("d_close")).getTime():null};
+      priority:val("d_prio"),source:val("d_source"),owner:val("d_owner"),dataSources:multiVals("d_datasources"),notes:val("d_notes"),probability:STAGE_PROB[stage],
+      expectedClose:val("d_close")?new Date(val("d_close")).getTime():null,
+      renewalDate:val("d_renewal")?new Date(val("d_renewal")).getTime():null};
     if(!data.name){toast("Deal name is required","err");return false;}
     if(id){const old=state.deals.find(d=>d.id===id);await dbUpdate("deals",id,data);if(old&&old.stage!==stage)logActivity("stage",`Deal “${data.name}” moved ${old.stage} → ${stage}`,"deal",id);}
     else{const nid=await dbAdd("deals",data);logActivity("deal",`Created deal “${data.name}” (${money(data.value)})`,"deal",nid);}
@@ -1108,7 +1160,7 @@ function dealForm(id){
   if(id){
     const out=()=>$("#d-ai");
     const run=async(label,task)=>{out().innerHTML=`<span class="spin"></span> ${label}…`;
-      try{const t=await askAI(task,`Focus on deal "${x.name}" ${money(x.value)} at stage ${x.stage}, company ${companyById(x.companyId)?.name||"?"}, priority ${x.priority}, expected close ${fmtDate(x.expectedClose)}.`);out().innerHTML=esc(t).replace(/\n/g,"<br>");}
+      try{const t=await askAI(task,`Focus on deal "${x.name}" ${money(x.value)} at stage ${x.stage}, company ${companyById(x.companyId)?.name||"?"}, priority ${x.priority}, expected close ${fmtDate(x.expectedClose)}${x.renewalDate?", renewal date "+fmtDate(x.renewalDate):""}.`);out().innerHTML=esc(t).replace(/\n/g,"<br>");}
       catch(e){out().innerHTML="⚠️ "+esc(e.message);}};
     setTimeout(()=>{const a=$("#d-ai-next"),b=$("#d-ai-risk");
       if(a)a.onclick=()=>run("Thinking","Suggest the single next step to advance this deal and one sentence why.");
