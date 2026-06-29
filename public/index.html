@@ -354,7 +354,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc }
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, writeBatch }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -1013,7 +1013,7 @@ function renderSettings(c){
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Slack","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div>
         <div class="card panel"><div class="panel-head"><h2>Data</h2></div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">${fbReady?"Connected to Firestore — changes persist in real time.":"Demo mode — configure Firebase in index.html to persist data."}</div>
-          ${!live(state.contacts).length?`<button class="btn" id="seeddemo">${I.spark}Load sample data</button>`:""}
+          ${!live(state.contacts).length?`<button class="btn" id="seedbtn">${I.spark}Seed 500 contacts, 75 companies &amp; 90 deals</button>`:""}
           <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><div style="font-size:13px;font-weight:600;margin-bottom:8px">Bulk import templates</div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">Download a CSV template, fill in your data, and use it when bulk import launches.</div>
           <div style="display:flex;gap:8px"><button class="btn" id="dl-contacts-tmpl">${I.download}Contacts CSV</button><button class="btn" id="dl-companies-tmpl">${I.download}Companies CSV</button></div></div></div>
@@ -1021,7 +1021,7 @@ function renderSettings(c){
     </div>`;
   c.querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{state.theme=b.dataset.themeSet;localStorage.setItem("pulse-theme",state.theme);render();});
   $("#addmember").onclick=()=>memberForm();
-  const sd=$("#seeddemo");if(sd)sd.onclick=()=>{seedDemo();toast("Sample data loaded","ok");};
+  const sd=$("#seedbtn");if(sd)sd.onclick=()=>{ if(fbReady)seedLive(sd); else{seedDemo();toast("Sample data loaded","ok");} };
   $("#dl-contacts-tmpl").onclick=()=>downloadCSVTemplate("contacts");
   $("#dl-companies-tmpl").onclick=()=>downloadCSVTemplate("companies");
 }
@@ -1309,30 +1309,66 @@ function seedDemo(){
     ["Acme Logistics","Logistics","51-200","Chicago, IL"],["Nimbus Retail","Retail","201-500","Austin, TX"],
     ["Vertex Health","Healthcare","500+","Boston, MA"],["Orbit Media","Marketing","11-50","Denver, CO"],
     ["Stride Fitness","Consumer","51-200","Miami, FL"],["Quill Software","SaaS","11-50","Seattle, WA"],
-    ["Harbor Financial","Finance","201-500","New York, NY"],["Pine Manufacturing","Manufacturing","500+","Detroit, MI"]];
-  state.companies=cos.map((c,i)=>({id:"co"+i,name:c[0],industry:c[1],size:c[2],location:c[3],website:"https://"+c[0].toLowerCase().replace(/\W+/g,"")+".com",owner:reps[i%reps.length],createdAt:now-i*DAY,updatedAt:now-i*3600e3,deletedAt:null}));
-  const fn=["Sarah","James","Maria","David","Priya","Tom","Lena","Marcus","Nina","Carlos","Emma","Raj","Olivia","Ben","Zoe","Liam"];
-  const ln=["Chen","Okafor","Rossi","Park","Nguyen","Bauer","Klein","Reyes","Ito","Mendez","Walsh","Patel","Brooks","Hayes","Stein","Ford"];
-  const statuses=["Lead","Lead","Qualified","Qualified","Customer","Customer","Churned"];
+    ["Harbor Financial","Finance","201-500","New York, NY"],["Pine Manufacturing","Manufacturing","500+","Detroit, MI"],
+    ["Atlas Consulting","Consulting","11-50","San Francisco, CA"],["Beacon Analytics","Analytics","11-50","Boston, MA"],
+    ["Cedar Education","Education","51-200","Chicago, IL"],["Delta Energy","Energy","500+","Houston, TX"],
+    ["Eagle Properties","Real Estate","51-200","Phoenix, AZ"],["Foresight Capital","Finance","11-50","New York, NY"],
+    ["Granite Construction","Construction","201-500","Dallas, TX"],["Horizon Biotech","Biotech","51-200","San Diego, CA"],
+    ["Impact Ventures","VC/PE","1-10","San Francisco, CA"],["Jade Networks","Telecom","201-500","Atlanta, GA"],
+    ["Kite Advertising","Marketing","11-50","Los Angeles, CA"],["Lumen Healthcare","Healthcare","201-500","Minneapolis, MN"],
+    ["Mesa Retail","Retail","51-200","Phoenix, AZ"],["Noble Insurance","Insurance","201-500","Hartford, CT"],
+    ["Olympus Hotels","Hospitality","500+","Las Vegas, NV"],["Pacific Seafood","Food & Bev","201-500","Portland, OR"],
+    ["Quantum Computing","Tech","11-50","Austin, TX"],["Radius Marketing","Marketing","11-50","Nashville, TN"],
+    ["Summit Staffing","HR/Staffing","51-200","Denver, CO"],["Terra Agriculture","Agriculture","201-500","Des Moines, IA"],
+    ["Union Aerospace","Aerospace","500+","Huntsville, AL"],["Valor Defense","Defense","500+","Virginia Beach, VA"],
+    ["Westgate Legal","Legal","11-50","Washington, DC"],["Xenon Pharma","Pharma","201-500","Cambridge, MA"],
+    ["Yellowstone Media","Media","11-50","Salt Lake City, UT"],["Zephyr Renewables","Energy","51-200","Denver, CO"],
+    ["Apex Systems","IT Services","201-500","Richmond, VA"],["Bluewave Fintech","Fintech","11-50","Miami, FL"],
+    ["Caliber Security","Cybersecurity","51-200","San Jose, CA"],["Dune Capital","Finance","1-10","New York, NY"],
+    ["Ember Robotics","Robotics","11-50","Pittsburgh, PA"],["Flux Logistics","Logistics","201-500","Memphis, TN"],
+    ["Gable Architecture","Architecture","11-50","Portland, OR"],["Helix Genomics","Biotech","11-50","San Francisco, CA"],
+    ["Ironclad Software","SaaS","51-200","Seattle, WA"],["Keystone Realty","Real Estate","51-200","Philadelphia, PA"],
+    ["Lattice Analytics","Analytics","11-50","Boston, MA"],["Mosaic Design","Design","11-50","Brooklyn, NY"],
+    ["North Star Shipping","Logistics","201-500","Seattle, WA"],["Onyx Wealth Mgmt","Finance","11-50","Chicago, IL"],
+    ["Prism Optics","Manufacturing","51-200","Rochester, NY"],["Quorum Advisors","Consulting","11-50","Washington, DC"],
+    ["Redwood Timber","Manufacturing","201-500","Eugene, OR"],["Solstice Solar","Energy","51-200","Scottsdale, AZ"],
+    ["Titanium Alloys","Manufacturing","201-500","Pittsburgh, PA"],["Unity Health","Healthcare","500+","Cleveland, OH"],
+    ["Vantage Networks","Telecom","201-500","Dallas, TX"],["Wavefront Audio","Consumer Tech","11-50","Los Angeles, CA"],
+    ["Xerion Diagnostics","Healthcare","51-200","Houston, TX"],["Yardbird Food Co","Food & Bev","51-200","Nashville, TN"],
+    ["Zenith Aerospace","Aerospace","201-500","Tucson, AZ"],["Arrow Logistics","Logistics","51-200","Kansas City, MO"],
+    ["Bright Path EdTech","Education","11-50","Austin, TX"],["Coral Hospitality","Hospitality","201-500","Orlando, FL"],
+    ["Deep Root Capital","VC/PE","1-10","San Francisco, CA"],["Encore Events","Events","11-50","New York, NY"],
+    ["Flashpoint Security","Cybersecurity","51-200","Washington, DC"],["GridScale Energy","Energy","51-200","Houston, TX"],
+    ["Highland Insurance","Insurance","500+","Hartford, CT"],["Ignite Marketing","Marketing","11-50","Chicago, IL"],
+    ["Junction Rail","Transport","500+","Omaha, NE"],["Kindred Health","Healthcare","51-200","Denver, CO"],
+    ["LightSpeed Commerce","E-commerce","201-500","San Francisco, CA"],["Marble Stone Works","Construction","51-200","Charlotte, NC"],
+    ["Nova Robotics","Robotics","51-200","Detroit, MI"],["Ocelot Software","SaaS","11-50","Austin, TX"],
+    ["Pinnacle Wealth","Finance","11-50","Boston, MA"],["Rugged Outdoors","Consumer","51-200","Denver, CO"],
+  ];
+  state.companies=cos.map((c,i)=>({id:"co"+i,name:c[0],industry:c[1],size:c[2],location:c[3],website:"https://"+c[0].toLowerCase().replace(/[^a-z0-9]+/g,"")+".com",owner:reps[i%reps.length],createdAt:now-(i+1)*2*DAY,updatedAt:now-i*3600e3,deletedAt:null}));
+  const fn=["Sarah","James","Maria","David","Priya","Tom","Lena","Marcus","Nina","Carlos","Emma","Raj","Olivia","Ben","Zoe","Liam","Ava","Noah","Isabella","Ethan","Mia","Lucas","Chloe","Aiden","Sofia"];
+  const ln=["Chen","Okafor","Rossi","Park","Nguyen","Bauer","Klein","Reyes","Ito","Mendez","Walsh","Patel","Brooks","Hayes","Stein","Ford","Warren","Bishop","Morgan","Rivera"];
+  const statuses=["Lead","Lead","Lead","Qualified","Qualified","Customer","Customer","Churned"];
   const sources=["Website","Referral","Cold outreach","Event","LinkedIn","Inbound"];
-  const titles=["VP Sales","Operations Lead","CEO","CTO","Procurement Mgr","Marketing Dir","Founder","Head of IT"];
-  state.contacts=Array.from({length:24},(_,i)=>({id:"c"+i,firstName:fn[i%fn.length],lastName:ln[(i*3)%ln.length],
-    email:(fn[i%fn.length]+"."+ln[(i*3)%ln.length]).toLowerCase()+"@"+cos[i%cos.length][0].toLowerCase().replace(/\W+/g,"")+".com",
-    phone:"(555) "+(100+i)+"-"+(1000+i*7),title:titles[i%titles.length],companyId:"co"+(i%cos.length),
+  const titles=["VP Sales","Operations Lead","CEO","CTO","Procurement Mgr","Marketing Dir","Founder","Head of IT","Account Exec","Business Dev","CFO","COO","Sales Manager","Product Manager","Director","VP Marketing"];
+  state.contacts=Array.from({length:500},(_,i)=>({id:"c"+i,firstName:fn[i%25],lastName:ln[Math.floor(i/25)%20],
+    email:(fn[i%25]+"."+ln[Math.floor(i/25)%20]).toLowerCase()+"@"+cos[i%cos.length][0].toLowerCase().replace(/[^a-z0-9]+/g,"")+".com",
+    phone:"(555) "+(100+Math.floor(i/10))+"-"+(1000+(i%1000)),title:titles[i%titles.length],companyId:"co"+(i%cos.length),
     status:statuses[i%statuses.length],source:sources[i%sources.length],owner:reps[i%reps.length],
-    tags:i%3===0?["priority"]:i%4===0?["newsletter"]:[],lastContacted:i%5===0?null:now-(i%14)*DAY,
-    notes:i%6===0?"Met at trade show. Interested in the enterprise tier.":"",createdAt:now-(i*1.5)*DAY,updatedAt:now-(i%10)*3600e3,deletedAt:null}));
-  const dealNames=["Annual plan","Pilot program","Enterprise upgrade","Renewal","Expansion","New logo","Add-on seats","Platform migration"];
-  state.deals=Array.from({length:18},(_,i)=>{const stage=STAGES[i%STAGES.length];return{id:"d"+i,
-    name:cos[i%cos.length][0]+" — "+dealNames[i%dealNames.length],companyId:"co"+(i%cos.length),contactId:"c"+(i%24),
-    value:[5000,12000,8500,24000,45000,15000,32000,9000][i%8]+i*500,stage,probability:STAGE_PROB[stage],
-    priority:PRIORITIES[i%3],source:sources[i%sources.length],owner:reps[i%reps.length],
-    expectedClose:now+((i%6)-1)*7*DAY,closedAt:(stage==="Won"||stage==="Lost")?now-(i%20)*DAY:null,
-    notes:"",order:i,createdAt:now-(i*2)*DAY,updatedAt:now-(i%8)*3600e3,deletedAt:null};});
+    tags:i%5===0?["priority"]:i%7===0?["newsletter"]:[],lastContacted:i%8===0?null:now-(i%21)*DAY,
+    notes:"",createdAt:now-(i+1)*DAY,updatedAt:now-(i%10)*3600e3,deletedAt:null}));
+  const dealNames=["Annual plan","Pilot program","Enterprise upgrade","Renewal","Expansion","New logo","Add-on seats","Platform migration","Q3 contract","Strategic partnership"];
+  const vals=[5000,8500,12000,15000,22000,24000,32000,45000,60000,9000];
+  state.deals=Array.from({length:90},(_,i)=>{
+    const stageIdx=i<55?i%5:i<73?5:6;const stage=STAGES[stageIdx];const closed=stage==="Won"||stage==="Lost";const daysAgo=closed?7+(i%358):0;
+    return{id:"d"+i,name:cos[i%cos.length][0]+" — "+dealNames[i%dealNames.length],companyId:"co"+(i%cos.length),contactId:"c"+(i%500),
+      value:vals[i%vals.length]+i*300,stage,probability:STAGE_PROB[stage],priority:PRIORITIES[i%3],source:sources[i%sources.length],owner:reps[i%reps.length],
+      expectedClose:closed?now-daysAgo*DAY:now+(i%12-2)*7*DAY,closedAt:closed?now-daysAgo*DAY:null,notes:"",order:i,
+      createdAt:now-(i+1)*2*DAY,updatedAt:now-(i%8)*3600e3,deletedAt:null};});
   const taskTitles=["Send proposal","Follow up on demo","Schedule kickoff call","Confirm pricing","Check in after trial","Prepare contract","Reply to RFP","Book discovery call"];
   state.tasks=Array.from({length:12},(_,i)=>({id:"t"+i,title:taskTitles[i%taskTitles.length]+" — "+cos[i%cos.length][0],
     due:now+((i%7)-3)*DAY,priority:PRIORITIES[i%3],owner:reps[i%reps.length],status:i%5===0?"done":"open",
-    relatedType:"deal",relatedId:"d"+(i%18),createdAt:now-i*DAY,updatedAt:now,deletedAt:null}));
+    relatedType:"deal",relatedId:"d"+(i%90),createdAt:now-i*DAY,updatedAt:now,deletedAt:null}));
   state.activities=[
     {id:"a0",type:"stage",text:"Deal “Vertex Health — Enterprise upgrade” moved Qualified → Proposal Sent",actor:"Ricky Schweky",relatedType:"deal",relatedId:"d3",createdAt:now-2*3600e3,deletedAt:null},
     {id:"a1",type:"contact",text:"Added contact Sarah Chen",actor:"Joe Harari",relatedType:"contact",relatedId:"c0",createdAt:now-5*3600e3,deletedAt:null},
@@ -1341,6 +1377,119 @@ function seedDemo(){
     {id:"a4",type:"deal",text:"Created deal “Harbor Financial — New logo” ($32,000)",actor:"Nathan Mosseri",relatedType:"deal",relatedId:"d6",createdAt:now-3*DAY,deletedAt:null},
   ];
   localSeq=100;
+}
+
+/* ---- live seed — writes 75 companies, 500 contacts, 90 deals to Firestore ---- */
+async function seedLive(btn){
+  if(btn){btn.disabled=true;btn.innerHTML=`<span class="spin"></span> Seeding…`;}
+  const now=Date.now(),DAY=864e5;
+  const reps=state.members.length?state.members.map(m=>m.name):["Ricky Schweky","Joe Harari","Gabe Lesser","Nathan Mosseri"];
+  const actor=state.user?.email||"seed@system";
+  const audit=(ca)=>({createdAt:ca,updatedAt:now,createdBy:actor,deletedAt:null});
+  const CO_DATA=[
+    ["Acme Logistics","Logistics","51-200","Chicago, IL"],["Nimbus Retail","Retail","201-500","Austin, TX"],
+    ["Vertex Health","Healthcare","500+","Boston, MA"],["Orbit Media","Marketing","11-50","Denver, CO"],
+    ["Stride Fitness","Consumer","51-200","Miami, FL"],["Quill Software","SaaS","11-50","Seattle, WA"],
+    ["Harbor Financial","Finance","201-500","New York, NY"],["Pine Manufacturing","Manufacturing","500+","Detroit, MI"],
+    ["Atlas Consulting","Consulting","11-50","San Francisco, CA"],["Beacon Analytics","Analytics","11-50","Boston, MA"],
+    ["Cedar Education","Education","51-200","Chicago, IL"],["Delta Energy","Energy","500+","Houston, TX"],
+    ["Eagle Properties","Real Estate","51-200","Phoenix, AZ"],["Foresight Capital","Finance","11-50","New York, NY"],
+    ["Granite Construction","Construction","201-500","Dallas, TX"],["Horizon Biotech","Biotech","51-200","San Diego, CA"],
+    ["Impact Ventures","VC/PE","1-10","San Francisco, CA"],["Jade Networks","Telecom","201-500","Atlanta, GA"],
+    ["Kite Advertising","Marketing","11-50","Los Angeles, CA"],["Lumen Healthcare","Healthcare","201-500","Minneapolis, MN"],
+    ["Mesa Retail","Retail","51-200","Phoenix, AZ"],["Noble Insurance","Insurance","201-500","Hartford, CT"],
+    ["Olympus Hotels","Hospitality","500+","Las Vegas, NV"],["Pacific Seafood","Food & Bev","201-500","Portland, OR"],
+    ["Quantum Computing","Tech","11-50","Austin, TX"],["Radius Marketing","Marketing","11-50","Nashville, TN"],
+    ["Summit Staffing","HR/Staffing","51-200","Denver, CO"],["Terra Agriculture","Agriculture","201-500","Des Moines, IA"],
+    ["Union Aerospace","Aerospace","500+","Huntsville, AL"],["Valor Defense","Defense","500+","Virginia Beach, VA"],
+    ["Westgate Legal","Legal","11-50","Washington, DC"],["Xenon Pharma","Pharma","201-500","Cambridge, MA"],
+    ["Yellowstone Media","Media","11-50","Salt Lake City, UT"],["Zephyr Renewables","Energy","51-200","Denver, CO"],
+    ["Apex Systems","IT Services","201-500","Richmond, VA"],["Bluewave Fintech","Fintech","11-50","Miami, FL"],
+    ["Caliber Security","Cybersecurity","51-200","San Jose, CA"],["Dune Capital","Finance","1-10","New York, NY"],
+    ["Ember Robotics","Robotics","11-50","Pittsburgh, PA"],["Flux Logistics","Logistics","201-500","Memphis, TN"],
+    ["Gable Architecture","Architecture","11-50","Portland, OR"],["Helix Genomics","Biotech","11-50","San Francisco, CA"],
+    ["Ironclad Software","SaaS","51-200","Seattle, WA"],["Keystone Realty","Real Estate","51-200","Philadelphia, PA"],
+    ["Lattice Analytics","Analytics","11-50","Boston, MA"],["Mosaic Design","Design","11-50","Brooklyn, NY"],
+    ["North Star Shipping","Logistics","201-500","Seattle, WA"],["Onyx Wealth Mgmt","Finance","11-50","Chicago, IL"],
+    ["Prism Optics","Manufacturing","51-200","Rochester, NY"],["Quorum Advisors","Consulting","11-50","Washington, DC"],
+    ["Redwood Timber","Manufacturing","201-500","Eugene, OR"],["Solstice Solar","Energy","51-200","Scottsdale, AZ"],
+    ["Titanium Alloys","Manufacturing","201-500","Pittsburgh, PA"],["Unity Health","Healthcare","500+","Cleveland, OH"],
+    ["Vantage Networks","Telecom","201-500","Dallas, TX"],["Wavefront Audio","Consumer Tech","11-50","Los Angeles, CA"],
+    ["Xerion Diagnostics","Healthcare","51-200","Houston, TX"],["Yardbird Food Co","Food & Bev","51-200","Nashville, TN"],
+    ["Zenith Aerospace","Aerospace","201-500","Tucson, AZ"],["Arrow Logistics","Logistics","51-200","Kansas City, MO"],
+    ["Bright Path EdTech","Education","11-50","Austin, TX"],["Coral Hospitality","Hospitality","201-500","Orlando, FL"],
+    ["Deep Root Capital","VC/PE","1-10","San Francisco, CA"],["Encore Events","Events","11-50","New York, NY"],
+    ["Flashpoint Security","Cybersecurity","51-200","Washington, DC"],["GridScale Energy","Energy","51-200","Houston, TX"],
+    ["Highland Insurance","Insurance","500+","Hartford, CT"],["Ignite Marketing","Marketing","11-50","Chicago, IL"],
+    ["Junction Rail","Transport","500+","Omaha, NE"],["Kindred Health","Healthcare","51-200","Denver, CO"],
+    ["LightSpeed Commerce","E-commerce","201-500","San Francisco, CA"],["Marble Stone Works","Construction","51-200","Charlotte, NC"],
+    ["Nova Robotics","Robotics","51-200","Detroit, MI"],["Ocelot Software","SaaS","11-50","Austin, TX"],
+    ["Pinnacle Wealth","Finance","11-50","Boston, MA"],["Rugged Outdoors","Consumer","51-200","Denver, CO"],
+  ];
+  const FIRST=["Sarah","James","Maria","David","Priya","Tom","Lena","Marcus","Nina","Carlos","Emma","Raj","Olivia","Ben","Zoe","Liam","Ava","Noah","Isabella","Ethan","Mia","Lucas","Chloe","Aiden","Sofia"];
+  const LAST=["Chen","Okafor","Rossi","Park","Nguyen","Bauer","Klein","Reyes","Ito","Mendez","Walsh","Patel","Brooks","Hayes","Stein","Ford","Warren","Bishop","Morgan","Rivera"];
+  const TITLES=["VP Sales","Operations Lead","CEO","CTO","Procurement Mgr","Marketing Dir","Founder","Head of IT","Account Exec","Business Dev","CFO","COO","Sales Manager","Product Manager","Director","VP Marketing"];
+  const STATUSES=["Lead","Lead","Lead","Qualified","Qualified","Customer","Customer","Churned"];
+  const SOURCES=["Website","Referral","Cold outreach","Event","LinkedIn","Inbound"];
+  const DEAL_NAMES=["Annual plan","Pilot program","Enterprise upgrade","Renewal","Expansion","New logo","Add-on seats","Platform migration","Q3 contract","Strategic partnership"];
+  const VALUES=[5000,8500,12000,15000,22000,24000,32000,45000,60000,9000];
+
+  // Pre-generate Firestore doc refs (so IDs are known before any write)
+  const coRefs=CO_DATA.map(()=>doc(collection(db,"companies")));
+  const cRefs=Array.from({length:500},()=>doc(collection(db,"contacts")));
+  const dRefs=Array.from({length:90},()=>doc(collection(db,"deals")));
+
+  const ops=[];
+  // Companies
+  coRefs.forEach((ref,i)=>{
+    const [name,industry,size,location]=CO_DATA[i];
+    ops.push([ref,{name,industry,size,location,website:"https://"+name.toLowerCase().replace(/[^a-z0-9]+/g,"")+".com",
+      owner:reps[i%reps.length],...audit(now-(i+1)*2*DAY)}]);
+  });
+  // Contacts — 25 first × 20 last = 500 unique combos
+  cRefs.forEach((ref,i)=>{
+    const fn=FIRST[i%25],ln=LAST[Math.floor(i/25)%20];
+    const [coName]=CO_DATA[i%CO_DATA.length];
+    ops.push([ref,{firstName:fn,lastName:ln,
+      email:(fn+"."+ln).toLowerCase()+"@"+coName.toLowerCase().replace(/[^a-z0-9]+/g,"")+".com",
+      phone:"(555) "+(100+Math.floor(i/10))+"-"+(1000+(i%1000)),
+      title:TITLES[i%TITLES.length],companyId:coRefs[i%coRefs.length].id,
+      status:STATUSES[i%STATUSES.length],source:SOURCES[i%SOURCES.length],
+      owner:reps[i%reps.length],tags:i%5===0?["priority"]:i%7===0?["newsletter"]:[],
+      lastContacted:i%8===0?null:now-(i%21)*DAY,notes:"",
+      ...audit(now-(i+1)*DAY)}]);
+  });
+  // Deals — 55 open (stages 0–4), 18 Won, 17 Lost
+  dRefs.forEach((ref,i)=>{
+    const stageIdx=i<55?i%5:i<73?5:6;
+    const stage=STAGES[stageIdx];
+    const closed=stage==="Won"||stage==="Lost";
+    const daysAgo=closed?7+Math.round((i%358)):0;
+    ops.push([ref,{
+      name:CO_DATA[i%CO_DATA.length][0]+" — "+DEAL_NAMES[i%DEAL_NAMES.length],
+      companyId:coRefs[i%coRefs.length].id,contactId:cRefs[i%500].id,
+      value:VALUES[i%VALUES.length]+i*300,stage,probability:STAGE_PROB[stage],
+      priority:PRIORITIES[i%3],source:SOURCES[i%SOURCES.length],owner:reps[i%reps.length],
+      expectedClose:closed?now-daysAgo*DAY:now+(i%12-2)*7*DAY,
+      closedAt:closed?now-daysAgo*DAY:null,notes:"",order:i,
+      ...audit(now-(i+1)*2*DAY)}]);
+  });
+
+  // Write in chunks of 499 (Firestore batch limit is 500)
+  try{
+    for(let i=0;i<ops.length;i+=499){
+      const b=writeBatch(db);
+      ops.slice(i,i+499).forEach(([r,d])=>b.set(r,d));
+      await b.commit();
+      if(btn)btn.innerHTML=`<span class="spin"></span> ${Math.min(i+499,ops.length)}/${ops.length}…`;
+    }
+    toast(`Seeded ${CO_DATA.length} companies, 500 contacts, 90 deals`,"ok");
+  }catch(e){
+    toast("Seed failed: "+e.message,"err");
+    if(btn){btn.disabled=false;btn.innerHTML=`${I.spark}Seed sample data`;}
+    return;
+  }
+  if(btn){btn.disabled=false;btn.innerHTML=`${I.spark}Re-seed data`;}
 }
 
 /* ====================================================================
