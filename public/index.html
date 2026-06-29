@@ -1403,7 +1403,6 @@ function renderDashboard(c){
   const newInPeriod=tf==="all"?C.length:Ctf.length;
 
   const stat=(lbl,val,icon,delta,cls,nav)=>`<div class="card stat"${nav?` data-dash-nav="${nav}"`:""}><div class="lbl"><span class="ic">${icon}</span>${lbl}</div><div class="val">${val}</div>${delta?`<div class="delta ${cls||""}">${delta}</div>`:""}</div>`;
-  const newInPeriod=tf==="all"?C.length:Ctf.length;
 
   // pipeline view helpers
   const pv=state._pipeView||"bars";
