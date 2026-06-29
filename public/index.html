@@ -3012,7 +3012,7 @@ function computeQuoteTotals(q){
   const users=Math.max(0,+(q.users?.count)||0);
   const pricePerUser=Math.max(0,+(q.users?.pricePerUser)||0);
   const mult=Math.max(0,+(q.users?.aiMultiplier)||0);
-  const aiPricePerUser=d.fullyLoaded;                              // fully-loaded AI cost / user / month
+  const aiPricePerUser=(state._aiCostPerUser>0?state._aiCostPerUser:d.fullyLoaded); // prefer Settings override, else computed
   const aiMonthly=users*aiPricePerUser*mult;
   const seatMonthly=users*pricePerUser;
   const bundleMonthly=Math.max(0,+(q.addons?.bundlePrice)||0);
@@ -3212,7 +3212,7 @@ function quoteBuilderModal(prefill){
         <div class="qb-line-sub">${money(t.monthly)} × 12</div>
       </div>
       <div class="qb-sum-foot">
-        <div class="qb-line-sub">AI cost basis: ${fmtUSD(derived.costPerQuestion,4)}/question · ${derived.provisionedQuestions} provisioned q/user · ${fmtUSD(derived.fullyLoaded)}/user fully-loaded</div>
+        <div class="qb-line-sub">${state._aiCostPerUser>0?`AI cost/user: ${fmtUSD(state._aiCostPerUser)} (from Settings — overrides computed ${fmtUSD(derived.fullyLoaded)})`:`AI cost basis: ${fmtUSD(derived.costPerQuestion,4)}/question · ${derived.provisionedQuestions} provisioned q/user · ${fmtUSD(derived.fullyLoaded)}/user fully-loaded`}</div>
         <div class="qb-line-sub" style="color:${headNeg?"var(--danger)":"var(--muted)"};margin-top:3px">${headNeg?"⚠️ ":""}Budget headroom: ${money(derived.headroom)} (${money(derived.expectedPooled)} expected vs ${money(ai.committedBudget)} committed)</div>
       </div>`;
   }
@@ -3257,7 +3257,7 @@ function quoteBuilderModal(prefill){
       users:q.users,
       addons:q.addons,
       // immutable snapshot of the settings active right now
-      snapshot:{ai:{...ai},integrations:settings.integrations.map(x=>({...x})),derived:aiDerived(ai)},
+      snapshot:{ai:{...ai},integrations:settings.integrations.map(x=>({...x})),derived:aiDerived(ai),aiCostOverride:state._aiCostPerUser||0},
       totals,
     };
     const id=await dbAdd("quotes",rec);
