@@ -390,7 +390,7 @@
 
   /* ---------- quote modal ---------- */
   .q-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadein .15s ease;}
-  .q-box{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow-lg);width:min(680px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;}
+  .q-box{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow-lg);width:min(860px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;}
   .q-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);}
   .q-head h2{font-size:15px;font-family:'Space Grotesk',sans-serif;margin:0;}
   .q-scroll{flex:1;overflow-y:auto;}
@@ -761,7 +761,8 @@ const state={ page:"dashboard", detail:null, user:null,
   _slackWebhookUrl: localStorage.getItem("pulse-slack-webhook")||"",
   _slackSyncing: false, _slackStatus: null,
   _dashOwner: localStorage.getItem("pulse-dash-owner")||"",
-  _aiCostPerUser: parseFloat(localStorage.getItem("pulse-ai-cost-per-user"))||0 };
+  _aiCostPerUser: parseFloat(localStorage.getItem("pulse-ai-cost-per-user"))||0,
+  _settingsSections: JSON.parse(localStorage.getItem("pulse-settings-sections")||"{}") };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
 
@@ -2785,6 +2786,8 @@ async function savePipelineStages(stages){
 }
 
 function renderSettings(c){
+  const sc=k=>state._settingsSections[k]!==false;
+  const chv=k=>`<button class="btn ghost sm" data-ss="${k}" style="padding:3px 7px;font-size:12px" title="${sc(k)?"Expand":"Collapse"}">${sc(k)?I.chevronDown:I.chevronUp}</button>`;
   const m=state.members.length?state.members:[{name:state.user.name,email:state.user.email,role:"Owner"}];
   const prods=live(state.products);
   const PROD_CAT_COLOR={Integration:"var(--accent)",AI:"#8b5cf6",Platform:"var(--ok)",Service:"var(--warn)"};
@@ -2794,19 +2797,23 @@ function renderSettings(c){
   c.innerHTML=`
     <div class="pagehead"><div><h1>Settings</h1><div class="sub">Workspace, team & integrations</div></div></div>
     <div style="display:flex;flex-direction:column;gap:14px">
-        <div class="card panel"><div class="panel-head"><h2>Team members</h2><button class="btn sm" id="addmember">${I.plus}Invite</button></div>
-          ${m.map(p=>`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)">${ava(p.name||p.email,30)}<div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(p.name||p.email)}</div><div class="faint" style="font-size:11.5px">${esc(p.email||"")}</div></div><span class="chip">${esc(p.role||"Sales Rep")}</span></div>`).join("")}</div>
-        <div class="card panel" id="pipeline-stages-panel"><div class="panel-head"><h2>Pipeline stages</h2><div style="display:flex;gap:6px"><button class="btn sm" id="ps-reset">${I.spark}Reset to defaults</button><button class="btn sm primary" id="ps-add">${I.plus}Add stage</button></div></div>
+        <div class="card panel"><div class="panel-head" ${sc("team")?'style="margin-bottom:0"':''}><h2>Team members</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn sm" id="addmember">${I.plus}Invite</button>${chv("team")}</div></div>
+          <div id="ss-team" ${sc("team")?'style="display:none"':''}>${m.map(p=>`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)">${ava(p.name||p.email,30)}<div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(p.name||p.email)}</div><div class="faint" style="font-size:11.5px">${esc(p.email||"")}</div></div><span class="chip">${esc(p.role||"Sales Rep")}</span></div>`).join("")}</div></div>
+        <div class="card panel" id="pipeline-stages-panel"><div class="panel-head" ${sc("pipeline")?'style="margin-bottom:0"':''}><h2>Pipeline stages</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn sm" id="ps-reset">${I.spark}Reset to defaults</button><button class="btn sm primary" id="ps-add">${I.plus}Add stage</button>${chv("pipeline")}</div></div>
+          <div id="ss-pipeline" ${sc("pipeline")?'style="display:none"':''}>
           <div id="ps-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px"></div>
-          <div style="display:flex;gap:8px;align-items:center"><button class="btn sm primary" id="ps-save">${I.check}Save order &amp; colors</button><span class="faint" style="font-size:12px">Drag rows to reorder. Changes apply instantly across all views after saving.</span></div></div>
+          <div style="display:flex;gap:8px;align-items:center"><button class="btn sm primary" id="ps-save">${I.check}Save order &amp; colors</button><span class="faint" style="font-size:12px">Drag rows to reorder. Changes apply instantly across all views after saving.</span></div></div></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
-        <div class="card panel"><div class="panel-head"><h2>Appearance</h2></div>
-          <div style="display:flex;gap:8px"><button class="btn ${state.theme==="light"?"primary":""}" data-theme-set="light">${I.sun}Light</button><button class="btn ${state.theme==="dark"?"primary":""}" data-theme-set="dark">${I.moon}Dark</button></div></div>
-        <div class="card panel"><div class="panel-head"><h2>AI assistant</h2></div>
+        <div class="card panel"><div class="panel-head" ${sc("appearance")?'style="margin-bottom:0"':''}><h2>Appearance</h2>${chv("appearance")}</div>
+          <div id="ss-appearance" ${sc("appearance")?'style="display:none"':''}>
+          <div style="display:flex;gap:8px"><button class="btn ${state.theme==="light"?"primary":""}" data-theme-set="light">${I.sun}Light</button><button class="btn ${state.theme==="dark"?"primary":""}" data-theme-set="dark">${I.moon}Dark</button></div></div></div>
+        <div class="card panel"><div class="panel-head" ${sc("ai-assistant")?'style="margin-bottom:0"':''}><h2>AI assistant</h2>${chv("ai-assistant")}</div>
+          <div id="ss-ai-assistant" ${sc("ai-assistant")?'style="display:none"':''}>
           <div style="font-size:13px;display:flex;align-items:center;gap:8px"><span class="chip"><span class="dot" style="background:${fbReady?"var(--ok)":"var(--warn)"}"></span>Proxy: /api/claude</span></div>
-          <div class="faint" style="font-size:12px;margin-top:10px">Powered by Claude via a server-side proxy. Your API key never reaches the browser, and the assistant is scoped to this workspace only.</div></div>
-        <div class="card panel"><div class="panel-head"><h2>AI cost assumptions</h2><button class="btn sm" id="sai-reset">${I.spark}Reset to defaults</button></div>
+          <div class="faint" style="font-size:12px;margin-top:10px">Powered by Claude via a server-side proxy. Your API key never reaches the browser, and the assistant is scoped to this workspace only.</div></div></div>
+        <div class="card panel"><div class="panel-head" ${sc("ai-cost")?'style="margin-bottom:0"':''}><h2>AI cost assumptions</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn sm" id="sai-reset">${I.spark}Reset to defaults</button>${chv("ai-cost")}</div></div>
+          <div id="ss-ai-cost" ${sc("ai-cost")?'style="display:none"':''}>
           <div class="faint" style="font-size:12px;margin-bottom:14px">Configure AI model pricing and usage assumptions used by the Quote Builder. Changes apply to future quotes only — saved quotes retain the snapshot they were built with.</div>
           <div class="qs-ai-grid">${sAiRows}</div>
           <div style="margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)">
@@ -2815,11 +2822,14 @@ function renderSettings(c){
           </div>
           <div class="card panel" style="margin-top:14px;background:var(--surface-2)"><div class="qb-sum-lbl" style="margin-bottom:8px">Derived values (live)</div><div id="sai-derived"></div></div>
           <div style="margin-top:14px"><button class="btn sm primary" id="sai-save">${I.check}Save AI assumptions</button></div>
+          </div>
         </div>
-        <div class="card panel"><div class="panel-head"><h2>Integrations</h2></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div>
+        <div class="card panel"><div class="panel-head" ${sc("integrations")?'style="margin-bottom:0"':''}><h2>Integrations</h2>${chv("integrations")}</div>
+          <div id="ss-integrations" ${sc("integrations")?'style="display:none"':''}>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div></div>
         <div class="card panel" id="clay-panel">
-          <div class="panel-head"><h2>Clay ETL Connector</h2><span class="clay-badge ok">${I.pulse}&nbsp;Live</span></div>
+          <div class="panel-head" ${sc("clay")?'style="margin-bottom:0"':''}><h2>Clay ETL Connector</h2><div style="display:flex;gap:6px;align-items:center"><span class="clay-badge ok">${I.pulse}&nbsp;Live</span>${chv("clay")}</div></div>
+          <div id="ss-clay" ${sc("clay")?'style="display:none"':''}>
           <div style="font-size:13px;color:var(--muted);margin-bottom:4px">Push prospect & enrichment data from <b>Clay</b> into your CRM in real time. Point a Clay webhook at this endpoint — every row lands as a contact (and company) automatically.</div>
           <div style="font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-top:12px">Webhook URL</div>
           <div class="clay-webhook-url" id="clay-url-box"><span id="clay-url-text" style="flex:1">https://pulse-crm-blush.vercel.app/api/clay-import</span><button class="clay-copy-btn" id="clay-copy">Copy</button></div>
@@ -2845,8 +2855,10 @@ function renderSettings(c){
             </tbody>
           </table>
           <div class="faint" style="font-size:12px;margin-top:10px">Required Vercel env vars: <code>FIREBASE_PROJECT_ID</code>, <code>FIREBASE_CLIENT_EMAIL</code>, <code>FIREBASE_PRIVATE_KEY</code> (Firebase service account). Optional: <code>CLAY_WEBHOOK_SECRET</code>. Existing contacts are updated (deduped by email); new ones are created. Each sync logs an activity entry.</div>
+          </div>
         </div>
-        <div class="card panel"><div class="panel-head"><h2>Data</h2></div>
+        <div class="card panel"><div class="panel-head" ${sc("data")?'style="margin-bottom:0"':''}><h2>Data</h2>${chv("data")}</div>
+          <div id="ss-data" ${sc("data")?'style="display:none"':''}>
           <div class="faint" style="font-size:12px;margin-bottom:10px">${fbReady?"Connected to Firestore — changes persist in real time.":"Demo mode — configure Firebase in index.html to persist data."}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button class="btn" id="seedbtn">${I.spark}${live(state.contacts).length?"Re-seed 500 contacts, 75 companies &amp; 90 deals":"Seed 500 contacts, 75 companies &amp; 90 deals"}</button>
@@ -2863,13 +2875,14 @@ function renderSettings(c){
             <button class="btn" id="imp-contacts-btn">${I.note}Import Contacts</button>
             <button class="btn" id="imp-companies-btn">${I.note}Import Companies</button>
             <button class="btn" id="imp-leads-btn">${I.note}Import Leads (both)</button>
-          </div></div></div>
+          </div></div></div></div>
         ${renderEtlCard()}
         ${renderApolloCard()}
         ${renderSlackCard()}
     </div>
     <div class="card panel" style="margin-top:14px">
-      <div class="panel-head"><h2>Product Offering</h2><button class="btn sm primary" id="addproduct">${I.plus}Add product</button></div>
+      <div class="panel-head" ${sc("products")?'style="margin-bottom:0"':''}><h2>Product Offering</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn sm primary" id="addproduct">${I.plus}Add product</button>${chv("products")}</div></div>
+      <div id="ss-products" ${sc("products")?'style="display:none"':''}>
       ${prods.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:4px">
         ${prods.map(p=>`<div style="border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 16px;display:flex;flex-direction:column;gap:8px">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -2887,25 +2900,30 @@ function renderSettings(c){
           ${p.price?`<div style="font-size:12px;font-weight:600;color:var(--accent)">${esc(p.price)}</div>`:""}
         </div>`).join("")}
       </div>`:`<div class="faint" style="font-size:13px;margin-top:4px">No products defined yet. Add your first product offering.</div>`}
+      </div>
     </div>
     <div class="card panel" style="margin-top:14px">
-      <div class="panel-head"><h2>Integration Pricing</h2><div style="display:flex;gap:8px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · future quotes only</span><button class="btn sm" id="intprice-reset">${I.spark}Reset to defaults</button><button class="btn sm primary" id="addintprice">${I.plus}Add integration</button></div></div>
+      <div class="panel-head" ${sc("int-pricing")?'style="margin-bottom:0"':''}><h2>Integration Pricing</h2><div style="display:flex;gap:8px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · future quotes only</span><button class="btn sm" id="intprice-reset">${I.spark}Reset to defaults</button><button class="btn sm primary" id="addintprice">${I.plus}Add integration</button>${chv("int-pricing")}</div></div>
+      <div id="ss-int-pricing" ${sc("int-pricing")?'style="display:none"':''}>
+
       <div class="faint" style="font-size:12px;margin-bottom:12px">Implementation cost and monthly fee per platform. Auto-populated from defaults. Edit any row to override pricing for future quotes — saved quotes stay frozen.</div>
       <div style="overflow-x:auto"><table class="qs-int-table" style="width:100%;border-collapse:collapse">
         <thead><tr><th style="text-align:center;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap">Level</th><th style="text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Platform / Integration</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Impl Cost</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Timeline</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Monthly</th><th style="padding:8px 6px;border-bottom:1px solid var(--line)"></th></tr></thead>
-        <tbody>${intPricing.integrations.slice().sort((a,b)=>((a.level||1)-(b.level||1))||a.name.localeCompare(b.name)).map(it=>`<tr>
-          <td style="font-size:12px;text-align:center;padding:7px 10px"><span class="chip" style="font-size:10.5px;font-weight:700">${it.level||1}</span></td>
-          <td style="font-size:13px;font-weight:500;padding:7px 10px">${esc(it.name)}</td>
-          <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${money(it.implCost)}</td>
-          <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${it.timeline} days</td>
-          <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${money(it.monthlyCost)}/mo</td>
-          <td style="padding:7px 6px"><div style="display:flex;gap:3px;justify-content:flex-end">
-            <button class="iconbtn" data-intprice-edit="${esc(it.id)}" title="Edit">${I.edit}</button>
+        <tbody>${intPricing.integrations.slice().sort((a,b)=>((a.level||1)-(b.level||1))||a.name.localeCompare(b.name)).map(it=>`<tr data-intprice-row="${esc(it.id)}">
+          <td style="padding:5px 6px;text-align:center"><select data-intprice-field="level" style="width:52px;padding:3px 4px;font-size:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);color:var(--ink)">${[1,2,3,4,5].map(n=>`<option value="${n}"${(it.level||1)===n?" selected":""}>${n}</option>`).join("")}</select></td>
+          <td style="padding:5px 6px"><input type="text" data-intprice-field="name" value="${esc(it.name)}" style="width:100%;min-width:130px;padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);color:var(--ink)"></td>
+          <td style="padding:5px 6px"><input type="number" data-intprice-field="implCost" value="${it.implCost}" min="0" step="100" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);color:var(--ink)"></td>
+          <td style="padding:5px 6px"><input type="number" data-intprice-field="timeline" value="${it.timeline}" min="1" step="1" style="width:60px;padding:3px 6px;font-size:12px;text-align:right;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);color:var(--ink)"></td>
+          <td style="padding:5px 6px"><input type="number" data-intprice-field="monthlyCost" value="${it.monthlyCost}" min="0" step="25" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);color:var(--ink)"></td>
+          <td style="padding:5px 6px"><div style="display:flex;gap:3px;justify-content:flex-end">
+            <button class="iconbtn" data-intprice-save="${esc(it.id)}" title="Save" style="color:var(--ok)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
             <button class="iconbtn" data-intprice-del="${esc(it.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button>
           </div></td>
         </tr>`).join("")}</tbody>
       </table></div>
+      </div>
     </div>`;
+  c.querySelectorAll("[data-ss]").forEach(b=>{b.onclick=()=>{const k=b.dataset.ss;const cur=state._settingsSections[k]!==false;state._settingsSections[k]=!cur;localStorage.setItem("pulse-settings-sections",JSON.stringify(state._settingsSections));render();};});
   c.querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{state.theme=b.dataset.themeSet;localStorage.setItem("pulse-theme",state.theme);render();});
   initPipelineStagesUI(c);
   $("#addmember").onclick=()=>memberForm();
@@ -2929,17 +2947,24 @@ function renderSettings(c){
   c.querySelectorAll("[data-edit-prod]").forEach(b=>b.onclick=()=>productForm(b.dataset.editProd));
   c.querySelectorAll("[data-del-prod]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this product?"))return;await dbRemove("products",b.dataset.delProd,"Product");render();});
   $("#addintprice").onclick=()=>integrationPricingModal(null,c);
-  $("#intprice-reset").onclick=async()=>{
-    if(!confirm("Reset all integration pricing to default values? This cannot be undone."))return;
+  c.querySelectorAll("[data-intprice-save]").forEach(b=>b.onclick=async()=>{
+    const intId=b.dataset.intpriceSave;
+    const row=c.querySelector(`[data-intprice-row="${intId}"]`);
+    if(!row)return;
+    const name=row.querySelector('[data-intprice-field="name"]').value.trim();
+    const level=parseInt(row.querySelector('[data-intprice-field="level"]').value)||1;
+    const implCost=parseFloat(row.querySelector('[data-intprice-field="implCost"]').value)||0;
+    const timeline=parseInt(row.querySelector('[data-intprice-field="timeline"]').value)||0;
+    const monthlyCost=parseFloat(row.querySelector('[data-intprice-field="monthlyCost"]').value)||0;
+    if(!name){toast("Name is required","err");return;}
+    if(timeline<1){toast("Timeline must be at least 1 day","err");return;}
     const qs=getQuoteSettings();
-    const newInts=DEFAULT_INTEGRATIONS.map(x=>({...x}));
+    const newInts=qs.integrations.map(x=>x.id===intId?{...x,name,level,implCost,timeline,monthlyCost}:x);
     const ok=qs._id
       ?await dbUpdate("quoteSettings",qs._id,{integrations:newInts},true)
       :(await dbAdd("quoteSettings",{ai:qs.ai,integrations:newInts},true))!=null;
-    if(!ok)return;
-    toast("Integration pricing reset to defaults","ok");renderSettings(c);
-  };
-  c.querySelectorAll("[data-intprice-edit]").forEach(b=>b.onclick=()=>integrationPricingModal(b.dataset.intpriceEdit,c));
+    if(ok)toast("Integration updated","ok");
+  });
   c.querySelectorAll("[data-intprice-del]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Remove this integration from the pricing table?"))return;
     const qs=getQuoteSettings();
@@ -3079,11 +3104,15 @@ function renderEtlCard(){
     </div>`;
   }
 
+  const etlCollapsed=state._settingsSections["etl"]!==false;
+  const etlChv=`<button class="btn ghost sm" data-ss="etl" style="padding:3px 7px;font-size:12px" title="${etlCollapsed?"Expand":"Collapse"}">${etlCollapsed?I.chevronDown:I.chevronUp}</button>`;
   return `<div class="card panel" id="etl-panel">
-    <div class="panel-head"><h2>Email Outreach Sync</h2></div>
+    <div class="panel-head" ${etlCollapsed?'style="margin-bottom:0"':''}><h2>Email Outreach Sync</h2>${etlChv}</div>
+    <div id="ss-etl" ${etlCollapsed?'style="display:none"':''}>
     <div class="faint" style="font-size:12px;margin-bottom:12px">Pull leads and campaign activity from your outbound email tools into the CRM. Contacts are matched by email (new leads are created; existing ones are updated). Keys are stored locally in your browser.</div>
     ${svcRow("instantly","Instantly","⚡",state._etlInstantlyKey,lastI)}
     ${svcRow("smartlead","Smartlead","📧",state._etlSmartleadKey,lastS)}
+    </div>
   </div>`;
 }
 
@@ -3093,8 +3122,11 @@ function renderApolloCard(){
   const status=state._apolloStatus;
   const savedKey=state._etlApolloKey;
   const syncedAgo=lastSync?timeAgo(+lastSync):"Never";
+  const apolloCollapsed=state._settingsSections["apollo"]!==false;
+  const apolloChv=`<button class="btn ghost sm" data-ss="apollo" style="padding:3px 7px;font-size:12px" title="${apolloCollapsed?"Expand":"Collapse"}">${apolloCollapsed?I.chevronDown:I.chevronUp}</button>`;
   return `<div class="card panel" id="apollo-panel">
-    <div class="panel-head"><h2>Apollo.io Connector</h2>${lastSync?`<span class="clay-badge ok">${I.pulse}&nbsp;Connected</span>`:`<span class="clay-badge warn">Not synced</span>`}</div>
+    <div class="panel-head" ${apolloCollapsed?'style="margin-bottom:0"':''}><h2>Apollo.io Connector</h2><div style="display:flex;gap:6px;align-items:center">${lastSync?`<span class="clay-badge ok">${I.pulse}&nbsp;Connected</span>`:`<span class="clay-badge warn">Not synced</span>`}${apolloChv}</div></div>
+    <div id="ss-apollo" ${apolloCollapsed?'style="display:none"':''}>
     <div class="faint" style="font-size:12px;margin-bottom:12px">Pull leads and contact data from your Apollo.io account into the CRM. Contacts are matched by email — new leads are created, existing ones are updated. Your API key is stored locally in your browser only.</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
       <input id="apollo-key" type="password" placeholder="Apollo API key" autocomplete="off"
@@ -3126,6 +3158,7 @@ function renderApolloCard(){
       </tbody>
     </table>
     <div class="faint" style="font-size:12px;margin-top:10px">Get your API key from <b>Apollo.io → Settings → Integrations → API Keys</b>. Each sync pulls up to 500 contacts (5 pages × 100). Run again to pull more — already-synced contacts are skipped by external ID.</div>
+    </div>
   </div>`;
 }
 
@@ -3137,8 +3170,11 @@ function renderSlackCard(){
   const savedChannels=state._slackChannels;
   const savedWebhook=state._slackWebhookUrl;
   const syncedAgo=lastSync?timeAgo(+lastSync):"Never";
+  const slackCollapsed=state._settingsSections["slack"]!==false;
+  const slackChv=`<button class="btn ghost sm" data-ss="slack" style="padding:3px 7px;font-size:12px" title="${slackCollapsed?"Expand":"Collapse"}">${slackCollapsed?I.chevronDown:I.chevronUp}</button>`;
   return `<div class="card panel" id="slack-panel">
-    <div class="panel-head"><h2>Slack ETL Connector</h2><span class="clay-badge ok">${I.pulse}&nbsp;Live</span></div>
+    <div class="panel-head" ${slackCollapsed?'style="margin-bottom:0"':''}><h2>Slack ETL Connector</h2><div style="display:flex;gap:6px;align-items:center"><span class="clay-badge ok">${I.pulse}&nbsp;Live</span>${slackChv}</div></div>
+    <div id="ss-slack" ${slackCollapsed?'style="display:none"':''}>
     <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Pull channel messages as CRM activities and push deal events (new deals, stage changes) to a Slack channel.</div>
     <div style="font-size:11.5px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Inbound — Slack → CRM</div>
     <div style="display:flex;gap:6px;margin-bottom:6px">
@@ -3169,6 +3205,7 @@ function renderSlackCard(){
       <span class="faint" style="font-size:12px">Auto-notifies on new deals &amp; stage changes.</span>
     </div>
     <div class="faint" style="font-size:12px">Inbound setup: create a Slack App, add Bot Token Scopes <code>channels:history channels:read groups:history groups:read</code>, install to workspace, copy the <b>Bot User OAuth Token</b> (xoxb-…). Outbound setup: Slack App → <b>Incoming Webhooks → Add to workspace</b>.</div>
+    </div>
   </div>`;
 }
 
@@ -3555,7 +3592,7 @@ function renderQuotes(c){
       <td style="font-weight:600">${money(t.annual||0)}</td>
       <td><span class="chip"><span class="dot" style="background:${QUOTE_STATUS_COLOR[q.status]||"#94a3b8"}"></span>${esc(q.status||"draft")}</span></td>
       <td class="faint">${timeAgo(q.createdAt)}</td>
-      <td><div class="rowact" style="display:flex;gap:4px"><button class="iconbtn" data-qdup="${esc(q.id)}" title="Duplicate as new quote">${I.copy}</button><button class="iconbtn" data-qdel="${esc(q.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button></div></td>
+      <td><div class="rowact" style="display:flex;gap:4px"><button class="iconbtn" data-qedit="${esc(q.id)}" title="Edit quote">${I.edit}</button><button class="iconbtn" data-qdup="${esc(q.id)}" title="Duplicate as new quote">${I.copy}</button><button class="iconbtn" data-qdel="${esc(q.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button></div></td>
     </tr>`;
   }).join("");
 
@@ -3586,13 +3623,15 @@ function renderQuotes(c){
   const n2=$("#q-new2");if(n2)n2.onclick=()=>quoteBuilderModal();
   $("#q-search").oninput=e=>{state._qSearch=e.target.value;renderQuotes(c);};
   c.querySelectorAll("th[data-sort]").forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(k==="company")return;const s=state._qSort;s.dir=s.col===k&&s.dir==="asc"?"desc":"asc";s.col=k;renderQuotes(c);});
-  c.querySelectorAll("tbody tr[data-qid]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-qdel]")||e.target.closest("[data-qdup]"))return;const q=state.quotes.find(x=>x.id===tr.dataset.qid);if(q)quoteViewModal(q);});
+  c.querySelectorAll("tbody tr[data-qid]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-qdel]")||e.target.closest("[data-qdup]")||e.target.closest("[data-qedit]"))return;const q=state.quotes.find(x=>x.id===tr.dataset.qid);if(q)quoteViewModal(q);});
   c.querySelectorAll("[data-qdel]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this quote?"))return;await dbRemove("quotes",b.dataset.qdel,"Quote");});
   c.querySelectorAll("[data-qdup]").forEach(b=>b.onclick=()=>{const q=state.quotes.find(x=>x.id===b.dataset.qdup);if(q)quoteBuilderModal(q);});
+  c.querySelectorAll("[data-qedit]").forEach(b=>b.onclick=()=>{const q=state.quotes.find(x=>x.id===b.dataset.qedit);if(q)quoteBuilderModal(q,q.id);});
 }
 
 // The live builder. `prefill` (optional) seeds fields from an existing quote.
-function quoteBuilderModal(prefill){
+// `editId` (optional) — when provided, save updates the existing quote instead of creating a new one.
+function quoteBuilderModal(prefill,editId){
   const settings=getQuoteSettings(); // SNAPSHOT basis — captured now, frozen into the saved quote.
   const ai=settings.ai, derived=aiDerived(ai);
   // sel: Set of selected integration IDs
@@ -3644,7 +3683,7 @@ function quoteBuilderModal(prefill){
   }).join("");
 
   overlay.innerHTML=`<div class="q-box qb-box">
-    <div class="q-head"><h2>${I.calc} New quote</h2>
+    <div class="q-head"><h2>${I.calc} ${editId?"Edit quote":"New quote"}</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <span class="chip"><span class="dot" style="background:var(--ok)"></span>Live pricing</span>
         <button class="iconbtn" id="qbX">${I.x}</button>
@@ -3703,7 +3742,7 @@ function quoteBuilderModal(prefill){
     <div class="q-foot">
       <span class="faint" style="font-size:11.5px;margin-right:auto;display:flex;align-items:center;gap:6px">${I.lock} Settings are snapshotted at save — pricing is frozen afterward.</span>
       <button class="btn" id="qbCancel">Cancel</button>
-      <button class="btn primary" id="qbSave">${I.calc}Save quote</button>
+      <button class="btn primary" id="qbSave">${editId?I.edit+"Update quote":I.calc+"Save quote"}</button>
     </div>
   </div>`;
 
@@ -3829,15 +3868,18 @@ function quoteBuilderModal(prefill){
       users:q.users,
       addons:q.addons,
       aiCostOverride:q.aiCostOverride||0,
-      // immutable snapshot of the settings active right now
       snapshot:{ai:{...ai},integrations:settings.integrations.map(x=>({...x})),derived:aiDerived(ai),aiCostOverride:q.aiCostOverride||0},
       totals,
     };
-    const id=await dbAdd("quotes",rec);
-    if(id){
-      logActivity("note",`Created quote "${name}" — impl ${money(totals.implementation)}, ${money(totals.monthly)}/mo`,rec.companyId?"company":null,rec.companyId||null);
-      close();
-    }else{saveBtn.disabled=false;saveBtn.innerHTML=`${I.calc}Save quote`;}
+    if(editId){
+      const ok=await dbUpdate("quotes",editId,rec);
+      if(ok!==false){logActivity("note",`Updated quote "${name}" — impl ${money(totals.implementation)}, ${money(totals.monthly)}/mo`,rec.companyId?"company":null,rec.companyId||null);close();}
+      else{saveBtn.disabled=false;saveBtn.innerHTML=`${I.edit}Update quote`;}
+    }else{
+      const id=await dbAdd("quotes",rec);
+      if(id){logActivity("note",`Created quote "${name}" — impl ${money(totals.implementation)}, ${money(totals.monthly)}/mo`,rec.companyId?"company":null,rec.companyId||null);close();}
+      else{saveBtn.disabled=false;saveBtn.innerHTML=`${I.calc}Save quote`;}
+    }
   };
   paint();
 }
@@ -3894,6 +3936,7 @@ function quoteViewModal(quote){
 
   overlay.innerHTML=`<div class="q-box">
     <div class="q-head"><h2>${I.calc} ${esc(quote.name||"Quote")}</h2><div style="display:flex;gap:8px">
+      <button class="btn sm" id="qvEdit">${I.edit}<span>Edit</span></button>
       <button class="btn sm" id="qvAi">${I.spark}<span>Explain</span></button>
       <button class="btn sm" id="qvCopy">${I.copy}<span>Copy</span></button>
       <button class="btn sm" id="qvDl">${I.download}<span>Download</span></button>
@@ -3906,6 +3949,7 @@ function quoteViewModal(quote){
 
   overlay.querySelector("#qvX").onclick=close;
   overlay.querySelector("#qvClose").onclick=close;
+  overlay.querySelector("#qvEdit").onclick=()=>{close();quoteBuilderModal(quote,quote.id);};
 
   const plain=()=>{
     const il=ints.map(it=>`  ${(it.name+" ×"+it.qty).padEnd(30)} impl ${money(it.implCost*it.qty)}  mo ${money(it.monthlyCost*it.qty)}`).join("\n");
