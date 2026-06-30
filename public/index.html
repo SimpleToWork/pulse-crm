@@ -730,7 +730,7 @@ const I={
 const state={ page:"dashboard", detail:null, user:null,
   contacts:[], companies:[], deals:[], tasks:[], activities:[], members:[], tickets:[], products:[], templates:[],
   supportCategories:[], slaRules:[], quotes:[], quoteSettings:[], pipelineStages:[],
-  _qSort:{col:"createdAt",dir:"desc"}, _qSearch:"",
+  _qSort:{col:"createdAt",dir:"desc"}, _qSearch:"", _qStatusF:"",
   theme: localStorage.getItem("pulse-theme")||"light", aiOpen:false, aiLog:[], cmdk:false, sideOpen:false,
   navCollapsed: localStorage.getItem("pulse-nav-collapsed")==="1",
   activityCollapsed: localStorage.getItem("pulse-activity-collapsed")==="1",
@@ -1708,18 +1708,14 @@ function renderContacts(c){
   c.innerHTML=`
     <div class="pagehead"><div><h1>Contacts</h1><div class="sub">${list.length} ${list.length===1?"person":"people"} in your CRM</div></div>
       <div style="display:flex;gap:8px"><button class="btn" id="csv-contacts">${I.download}<span>CSV template</span></button><button class="btn" id="importc">${I.note}<span>Import CSV</span></button><button class="btn" id="importleads">${I.note}<span>Import Leads</span></button><button class="btn" id="finddupc">${I.alert}<span>Duplicates</span></button><button class="btn primary" id="newc">${I.plus}<span>New contact</span></button></div></div>
-    <div class="toolbar"><div class="field-search">${I.search}<input id="csearch" placeholder="Search by name, email, company…" value="${esc(state._cSearch||"")}"></div></div>
     <div class="card tablecard" id="ctable"></div>`;
   const SI=col=>`<span class="sort-ind"></span>`;
   const thCls=(col)=>"sortable"+(state._cSort.col===col?" sorted-"+state._cSort.dir:"");
   const draw=()=>{
-    const q=($("#csearch").value||"").toLowerCase();
-    state._cSearch=q;
     const cf=state._cColF;
     let rows=list.filter(x=>{
       const co=companyById(x.companyId)?.name||"";
       const hay=(contactName(x)+" "+(x.email||"")+" "+co).toLowerCase();
-      if(!(!q||hay.includes(q)))return false;
       if(cf.nameEmail&&!hay.includes(cf.nameEmail.toLowerCase()))return false;
       if(cf.status&&(x.status||"Lead")!==cf.status)return false;
       if(cf.owner&&!(x.owner||"").toLowerCase().includes(cf.owner.toLowerCase()))return false;
@@ -1774,7 +1770,7 @@ function renderContacts(c){
     $("#ctable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();contactForm(b.dataset.edit);});
     const n2=$("#newc2"); if(n2)n2.onclick=()=>contactForm();
   };
-  $("#csearch").oninput=draw; $("#newc").onclick=()=>contactForm();
+  $("#newc").onclick=()=>contactForm();
   $("#csv-contacts").onclick=()=>downloadCSVTemplate("contacts"); $("#importc").onclick=()=>bulkUploadModal("contacts"); $("#importleads").onclick=()=>bulkUploadModal("leads");
   $("#finddupc").onclick=()=>showAllDuplicates("contacts"); draw();
 }
@@ -1833,19 +1829,12 @@ function renderCompanies(c){
   c.innerHTML=`
     <div class="pagehead"><div><h1>Companies</h1><div class="sub">${list.length} ${list.length===1?"company":"companies"}</div></div>
       <div style="display:flex;gap:8px"><button class="btn" id="csv-companies">${I.download}<span>CSV template</span></button><button class="btn" id="importco">${I.note}<span>Import CSV</span></button><button class="btn" id="finddupc">${I.alert}<span>Duplicates</span></button><button class="btn primary" id="newco">${I.plus}<span>New company</span></button></div></div>
-    <div class="toolbar">
-      <button class="btn sm ${state._coTab==="all"?"primary":""}" data-cotab="all">All Companies</button>
-      <button class="btn sm ${state._coTab==="open"?"primary":""}" data-cotab="open">With Open Deals</button>
-      <button class="btn sm ${state._coTab==="won"?"primary":""}" data-cotab="won">With Won Deals</button>
-      <div class="field-search" style="margin-left:auto">${I.search}<input id="cosearch" placeholder="Search companies…"></div></div>
     <div class="card tablecard" id="cotable"></div>`;
   const SI=()=>`<span class="sort-ind"></span>`;
   const thCls=(col)=>"sortable"+(state._coSort.col===col?" sorted-"+state._coSort.dir:"");
   const draw=()=>{
-    const q=($("#cosearch").value||"").toLowerCase();
     const cf=state._coColF,tab=state._coTab;
     let rows=list.filter(x=>{
-      if(!(!q||(x.name+" "+(x.industry||"")).toLowerCase().includes(q)))return false;
       if(cf.name&&!x.name.toLowerCase().includes(cf.name.toLowerCase()))return false;
       if(cf.industry&&!(x.industry||"").toLowerCase().includes(cf.industry.toLowerCase()))return false;
       if(cf.size&&!(x.size||"").toLowerCase().includes(cf.size.toLowerCase()))return false;
@@ -1876,7 +1865,7 @@ function renderCompanies(c){
         <th class="${thCls("industry")}" data-sort="industry">Industry${SI()}<input class="th-fi" id="cf-coind" placeholder="Filter industry…" value="${esc(cf.industry||"")}"></th>
         <th class="${thCls("size")}" data-sort="size">Size${SI()}<input class="th-fi" id="cf-cosize" placeholder="Filter size…" value="${esc(cf.size||"")}"></th>
         <th class="${thCls("contacts")}" data-sort="contacts">Contacts${SI()}${sdd("cf-cocts",[{value:"",label:"Any"},{value:"1",label:"Has contacts"},{value:"2",label:"2+"},{value:"5",label:"5+"}],cf.minContacts||"","Any")}</th>
-        <th class="${thCls("openDeals")}" data-sort="openDeals">Open deals${SI()}</th>
+        <th class="${thCls("openDeals")}" data-sort="openDeals">Open deals${SI()}${sdd("cf-cotab",[{value:"all",label:"All"},{value:"open",label:"With Open Deals"},{value:"won",label:"With Won Deals"}],tab,"All")}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-coowner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
         <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-cocreatedby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
         <th></th>
@@ -1895,16 +1884,16 @@ function renderCompanies(c){
     if(cfInd){cfInd.oninput=e=>{state._coColF.industry=e.target.value;draw();};cfInd.onclick=e=>e.stopPropagation();}
     if(cfSz){cfSz.oninput=e=>{state._coColF.size=e.target.value;draw();};cfSz.onclick=e=>e.stopPropagation();}
     wireSdd("cf-cocts",v=>{state._coColF.minContacts=v;draw();});
+    wireSdd("cf-cotab",v=>{state._coTab=v;draw();});
     if(cfOw){cfOw.oninput=e=>{state._coColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
     if(cfCrBy){cfCrBy.oninput=e=>{state._coColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
     $("#cotable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"company",id:tr.dataset.id};render();});
     $("#cotable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();companyForm(b.dataset.edit);});
     const n2=$("#newco2");if(n2)n2.onclick=()=>companyForm();
   };
-  $("#cosearch").oninput=draw;$("#newco").onclick=()=>companyForm();
+  $("#newco").onclick=()=>companyForm();
   $("#csv-companies").onclick=()=>downloadCSVTemplate("companies");$("#importco").onclick=()=>bulkUploadModal("companies");
   $("#finddupc").onclick=()=>showAllDuplicates("companies");
-  c.querySelectorAll("[data-cotab]").forEach(b=>b.onclick=()=>{state._coTab=b.dataset.cotab;renderCompanies(c);});
   draw();
 }
 function renderCompanyDetail(c,id){
@@ -1975,11 +1964,7 @@ function renderDeals(c){
     <div class="toolbar" style="margin-bottom:${tf==="custom"?"4px":"8px"}">${tfBtns}</div>
     <div id="deals-tf-daterange-row" style="display:${tf==="custom"?"flex":"none"};align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap;margin-bottom:8px"><span style="font-size:13px;color:var(--muted)">From</span><input type="date" class="input" id="deals-tf-from" value="${esc(state._dealsTfFrom||"")}" style="width:auto"><span style="font-size:13px;color:var(--muted)">to</span><input type="date" class="input" id="deals-tf-to" value="${esc(state._dealsTfTo||"")}" style="width:auto"></div>
     ${isList
-      ?`<div class="toolbar"><div class="field-search">${I.search}<input id="dsearch" placeholder="Search deals, companies, owners…" value="${esc(state._dSearch||"")}"></div>
-          <select class="input" id="dstage"><option value="">All stages</option>${stageList().map(s=>`<option value="${esc(s)}"${(state._dStageF||"")=== s?" selected":""}>${esc(s)}</option>`).join("")}</select>
-          <select class="input" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${(state._dPrioF||"")=== p?" selected":""}>${esc(p)}</option>`).join("")}</select>
-          <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
-         <div class="card tablecard" id="dtable"></div>`
+      ?`<div class="card tablecard" id="dtable"></div>`
       :`<div class="toolbar"><div class="field-search">${I.search}<input id="bsearch" placeholder="Search deals, companies, owners…" value="${esc(state._bSearch||"")}"></div><select class="input" id="bclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
           ${ori==="v"?`<div class="board-vert-wrap"><div class="board vert" id="board"></div></div>`:`<div class="board" id="board"></div>`}`}`;
   const setView=(v,o)=>{state._dView=v;if(o)state._pipeOri=o;try{localStorage.setItem("pulse-deals-view",v);if(o)localStorage.setItem("pulse-pipe-ori",o);}catch(_){}renderDeals(c);};
@@ -1999,11 +1984,9 @@ function renderDeals(c){
     const SI=()=>`<span class="sort-ind"></span>`;
     const thCls=col=>"sortable"+(state._dSort.col===col?" sorted-"+state._dSort.dir:"");
     const draw=()=>{
-      const q=($("#dsearch")?.value||state._dSearch||"").toLowerCase();
-      state._dSearch=q;
       const stg=state._dStageF||"",pr=state._dPrioF||"",cf=state._dCloseF||"";
       const dcf=state._dColF;
-      try{localStorage.setItem("pulse-deals-search",q);localStorage.setItem("pulse-deals-stage",stg);localStorage.setItem("pulse-deals-prio",pr);localStorage.setItem("pulse-deals-close",cf);}catch(_){}
+      try{localStorage.setItem("pulse-deals-stage",stg);localStorage.setItem("pulse-deals-prio",pr);localStorage.setItem("pulse-deals-close",cf);}catch(_){}
       const _now=Date.now();
       const _sow=_now-new Date().getDay()*864e5;const _eow=_sow+7*864e5;
       const _som=new Date();_som.setDate(1);_som.setHours(0,0,0,0);
@@ -2012,7 +1995,6 @@ function renderDeals(c){
       const _eoq=new Date(_soq.getFullYear(),_qm+3,1).getTime();
       let rows=D.filter(d=>{
         const co=companyById(d.companyId)?.name||"";
-        if(q&&!(d.name.toLowerCase().includes(q)||co.toLowerCase().includes(q)||(d.owner||"").toLowerCase().includes(q)))return false;
         if(stg&&d.stage!==stg)return false;
         if(pr&&(d.priority||"low")!==pr)return false;
         if(dcf.name&&!d.name.toLowerCase().includes(dcf.name.toLowerCase()))return false;
@@ -2082,7 +2064,6 @@ function renderDeals(c){
       if(dcfOwEl){dcfOwEl.oninput=e=>{state._dColF.owner=e.target.value;draw();};dcfOwEl.onclick=e=>e.stopPropagation();}
       if(dcfCrByEl){dcfCrByEl.oninput=e=>{state._dColF.createdBy=e.target.value;draw();};dcfCrByEl.onclick=e=>e.stopPropagation();}
     };
-    const srEl=$("#dsearch");if(srEl)srEl.oninput=draw;
     draw();
   } else {
     const bCloseEl=$("#bclosedate");
@@ -2169,12 +2150,10 @@ function dealCard(d,q){
 /* ---------------- Tasks ---------------- */
 function renderTasks(c){
   const T=live(state.tasks);
-  const filters={today:"Today",overdue:"Overdue",open:"Open",done:"Completed",all:"All"};
   if(!state._tf)state._tf="open";
   c.innerHTML=`
     <div class="pagehead"><div><h1>Tasks</h1><div class="sub">${T.filter(t=>t.status!=="done").length} open · ${T.filter(t=>t.status!=="done"&&isOverdue(t.due)).length} overdue</div></div>
       <button class="btn primary" id="newt">${I.plus}<span>New task</span></button></div>
-    <div class="toolbar">${Object.entries(filters).map(([k,v])=>`<button class="btn sm ${state._tf===k?"primary":""}" data-tf="${k}">${v}</button>`).join("")}</div>
     <div class="card tablecard" id="ttable"></div>`;
   const SI=()=>`<span class="sort-ind"></span>`;
   const thCls=(col)=>"sortable"+(state._tSort.col===col?" sorted-"+state._tSort.dir:"");
@@ -2207,7 +2186,7 @@ function renderTasks(c){
         <th style="width:40px"></th>
         <th class="${thCls("title")}" data-sort="title">Task${SI()}<input class="th-fi" id="cf-ttitle" placeholder="Filter task…" value="${esc(cf.title||"")}"></th>
         <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}${sdd("cf-tprio",[{value:"",label:"All priorities"},...["high","medium","low"].map(p=>({value:p,label:p}))],cf.priority||"","All priorities")}</th>
-        <th class="${thCls("due")}" data-sort="due">Due date${SI()}</th>
+        <th class="${thCls("due")}" data-sort="due">Due date${SI()}${sdd("cf-tstatus",[{value:"open",label:"Open"},{value:"today",label:"Today"},{value:"overdue",label:"Overdue"},{value:"done",label:"Completed"},{value:"all",label:"All"}],f||"open","Open")}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-towner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
         <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-tcrby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
         <th></th>
@@ -2225,6 +2204,7 @@ function renderTasks(c){
     $("#ttable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>setSort(th.dataset.sort));
     const cfOw=$("#cf-towner"),cfTi=$("#cf-ttitle"),cfCrBy=$("#cf-tcrby");
     wireSdd("cf-tprio",v=>{state._tColF.priority=v;draw();});
+    wireSdd("cf-tstatus",v=>{state._tf=v;draw();});
     if(cfOw){cfOw.oninput=e=>{state._tColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
     if(cfTi){cfTi.oninput=e=>{state._tColF.title=e.target.value;draw();};cfTi.onclick=e=>e.stopPropagation();}
     if(cfCrBy){cfCrBy.oninput=e=>{state._tColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
@@ -2234,7 +2214,6 @@ function renderTasks(c){
     $("#ttable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-done]")||e.target.closest("[data-edit]"))return;taskForm(tr.dataset.id);});
     const n2=$("#newt2");if(n2)n2.onclick=()=>taskForm();
   };
-  c.querySelectorAll("[data-tf]").forEach(b=>b.onclick=()=>{state._tf=b.dataset.tf;renderTasks(c);});
   $("#newt").onclick=()=>taskForm();draw();
 }
 function relLabel(t){ if(!t.relatedId)return"";
@@ -2259,20 +2238,16 @@ function renderTickets(c){
   c.innerHTML=`
     <div class="pagehead"><div><h1>Support Tickets</h1><div class="sub">${list.length} ticket${list.length===1?"":"s"} · ${open} open</div></div>
       <button class="btn primary" id="newtk">${I.plus}<span>New ticket</span></button></div>
-    <div class="toolbar">
-      <div class="field-search">${I.search}<input id="tksearch" placeholder="Search by subject, company, contact…" value="${esc(state._tkSearch||"")}"></div>
-    </div>
     <div class="card tablecard" id="tktable"></div>`;
   const SI=()=>`<span class="sort-ind"></span>`;
   const thCls=col=>"sortable"+(state._tkSort.col===col?" sorted-"+state._tkSort.dir:"");
   const draw=()=>{
-    const q=($("#tksearch")?.value||state._tkSearch||"").toLowerCase();
+    const q=state._tkSearch||"";
     const st=state._tkColF.status||"",pr=state._tkColF.priority||"",ty=state._tkColF.type||"";
-    state._tkSearch=q;
     let rows=list.filter(x=>{
       const co=companyById(x.companyId)?.name||"",ct=x.contactId?contactName(contactById(x.contactId)||{}):"";
       const hay=(x.subject+" "+co+" "+ct).toLowerCase();
-      if(q&&!hay.includes(q))return false;
+      if(q&&!hay.includes(q.toLowerCase()))return false;
       if(st&&x.status!==st)return false;
       if(pr&&(x.priority||"")!==pr)return false;
       if(ty&&(x.type||"")!==ty)return false;
@@ -2314,7 +2289,7 @@ function renderTickets(c){
     const tkPrArr=[{value:"",label:"All priorities"},...["low","medium","high","urgent"].map(p=>({value:p,label:p}))];
     $("#tktable").innerHTML=rows.length?`<table><thead>
       <tr>
-        <th class="${thCls("subject")}" data-sort="subject">Subject${SI()}${sdd("tktype",tkTyArr,ty,"All types")}</th>
+        <th class="${thCls("subject")}" data-sort="subject">Subject${SI()}<input class="th-fi" id="tksearch" placeholder="Search subject…" value="${esc(state._tkSearch||"")}">${sdd("tktype",tkTyArr,ty,"All types")}</th>
         <th class="${thCls("status")}" data-sort="status">Status${SI()}${sdd("tkstatus",tkStArr,st,"All statuses")}</th>
         <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}${sdd("tkprio",tkPrArr,pr,"All priorities")}</th>
         <th>SLA</th>
@@ -2331,12 +2306,12 @@ function renderTickets(c){
     wireSdd("tkstatus",v=>{state._tkColF.status=v;draw();});
     wireSdd("tkprio",v=>{state._tkColF.priority=v;draw();});
     wireSdd("tktype",v=>{state._tkColF.type=v;draw();});
-    const tkCoEl=$("#tk-co"),tkCtEl=$("#tk-ct"),tkOwEl=$("#tk-owner");
+    const tkCoEl=$("#tk-co"),tkCtEl=$("#tk-ct"),tkOwEl=$("#tk-owner"),tkSrEl=$("#tksearch");
+    if(tkSrEl){tkSrEl.oninput=e=>{state._tkSearch=e.target.value;draw();};tkSrEl.onclick=e=>e.stopPropagation();}
     if(tkCoEl){tkCoEl.oninput=e=>{state._tkColF.company=e.target.value;draw();};tkCoEl.onclick=e=>e.stopPropagation();}
     if(tkCtEl){tkCtEl.oninput=e=>{state._tkColF.contact=e.target.value;draw();};tkCtEl.onclick=e=>e.stopPropagation();}
     if(tkOwEl){tkOwEl.oninput=e=>{state._tkColF.owner=e.target.value;draw();};tkOwEl.onclick=e=>e.stopPropagation();}
   };
-  const tkSrEl=$("#tksearch");if(tkSrEl)tkSrEl.oninput=draw;
   $("#newtk").onclick=()=>ticketForm();draw();
 }
 
@@ -3574,13 +3549,16 @@ function quoteContext(){
 function renderQuotes(c){
   const settings=getQuoteSettings();
   const qq=(state._qSearch||"").toLowerCase();
+  const qsf=state._qStatusF||"";
   let list=live(state.quotes);
   if(qq)list=list.filter(q=>(q.name||"").toLowerCase().includes(qq)||(companyById(q.companyId)?.name||"").toLowerCase().includes(qq));
+  if(qsf)list=list.filter(q=>(q.status||"draft")===qsf);
   const {col,dir}=state._qSort;const mul=dir==="asc"?1:-1;
   const sortVal=(q)=>({name:(q.name||"").toLowerCase(),implementation:q.totals?.implementation||0,monthly:q.totals?.monthly||0,annual:q.totals?.annual||0,status:q.status||"",createdAt:q.createdAt||0}[col]);
   list=[...list].sort((a,b)=>{const va=sortVal(a),vb=sortVal(b);return va<vb?-1*mul:va>vb?1*mul:0;});
   const SI=k=>`<span class="sort-ind"></span>`;
   const thCls=k=>"sortable"+(col===k?(dir==="asc"?" sorted-asc":" sorted-desc"):"");
+  const qStOpts=[{value:"",label:"All statuses"},...QUOTE_STATUSES.map(s=>({value:s,label:s}))];
 
   const rows=list.map(q=>{
     const co=companyById(q.companyId);const t=q.totals||{};
@@ -3603,25 +3581,22 @@ function renderQuotes(c){
         <button class="btn primary" id="q-new">${I.plus}<span>New quote</span></button>
       </div>
     </div>
-    <div class="toolbar">
-      <div class="field-search">${I.search}<input id="q-search" placeholder="Search quotes…" value="${esc(state._qSearch||"")}"></div>
-      <span class="faint" style="font-size:12px;margin-left:auto">${live(state.quotes).length} quote${live(state.quotes).length===1?"":"s"} · ${settings.integrations.length} integrations available</span>
-    </div>
-    ${list.length?`<div class="card tablecard"><table id="q-table"><thead><tr>
-      <th class="${thCls("name")}" data-sort="name">Quote${SI()}</th>
+    ${list.length||qq||qsf?`<div class="card tablecard"><table id="q-table"><thead><tr>
+      <th class="${thCls("name")}" data-sort="name">Quote${SI()}<input class="th-fi" id="q-search" placeholder="Search quotes…" value="${esc(state._qSearch||"")}"></th>
       <th class="${thCls("company")}" data-sort="company">Company</th>
       <th class="${thCls("implementation")}" data-sort="implementation">Implementation${SI()}</th>
       <th class="${thCls("monthly")}" data-sort="monthly">Monthly${SI()}</th>
       <th class="${thCls("annual")}" data-sort="annual">Annual${SI()}</th>
-      <th class="${thCls("status")}" data-sort="status">Status${SI()}</th>
+      <th class="${thCls("status")}" data-sort="status">Status${SI()}${sdd("q-status",qStOpts,qsf,"All statuses")}</th>
       <th class="${thCls("createdAt")}" data-sort="createdAt">Created${SI()}</th>
       <th></th>
-    </tr></thead><tbody>${rows}</tbody></table></div>`
-    :`<div class="empty"><div class="ill">${I.calc}</div><h3>${qq?"No quotes match":"No quotes yet"}</h3><p>${qq?"Try a different search.":"Build your first quote — select integrations, set the seat count, and watch the price calculate live."}</p>${qq?"":`<button class="btn primary" id="q-new2">${I.plus}New quote</button>`}</div>`}`;
+    </tr></thead><tbody>${rows.length?rows:`<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--faint)">No quotes match filters</td></tr>`}</tbody></table></div>`
+    :`<div class="empty"><div class="ill">${I.calc}</div><h3>No quotes yet</h3><p>Build your first quote — select integrations, set the seat count, and watch the price calculate live.</p><button class="btn primary" id="q-new2">${I.plus}New quote</button></div>`}`;
 
   $("#q-new").onclick=()=>quoteBuilderModal();
   const n2=$("#q-new2");if(n2)n2.onclick=()=>quoteBuilderModal();
-  $("#q-search").oninput=e=>{state._qSearch=e.target.value;renderQuotes(c);};
+  const qSrEl=$("#q-search");if(qSrEl){qSrEl.oninput=e=>{state._qSearch=e.target.value;renderQuotes(c);};qSrEl.onclick=e=>e.stopPropagation();}
+  wireSdd("q-status",v=>{state._qStatusF=v;renderQuotes(c);});
   c.querySelectorAll("th[data-sort]").forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(k==="company")return;const s=state._qSort;s.dir=s.col===k&&s.dir==="asc"?"desc":"asc";s.col=k;renderQuotes(c);});
   c.querySelectorAll("tbody tr[data-qid]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-qdel]")||e.target.closest("[data-qdup]")||e.target.closest("[data-qedit]"))return;const q=state.quotes.find(x=>x.id===tr.dataset.qid);if(q)quoteViewModal(q);});
   c.querySelectorAll("[data-qdel]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this quote?"))return;await dbRemove("quotes",b.dataset.qdel,"Quote");});
