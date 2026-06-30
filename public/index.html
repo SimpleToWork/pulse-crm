@@ -213,7 +213,7 @@
   .prio.low{background:var(--surface-2);color:var(--muted);}
   /* vertical kanban */
   .board.vert{display:flex;flex-direction:column;overflow-x:visible;padding-bottom:0;}
-  .board.vert .kcol{flex-direction:row;flex-wrap:wrap;align-items:flex-start;min-height:auto;gap:9px;}
+  .board.vert .kcol{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;min-height:auto;gap:9px;overflow-x:auto;}
   .board.vert .kcol-head{flex:none;width:132px;min-width:132px;flex-direction:column;align-items:flex-start;gap:4px;padding:4px 10px 4px 4px;border-right:2px solid var(--line);align-self:stretch;}
   .board.vert .kcol-head .tot{margin-left:0;}
   .board.vert .dealcard{width:200px;flex:none;}
@@ -670,7 +670,7 @@ const state={ page:"dashboard", detail:null, user:null,
   _cSort:{col:"",dir:"asc"}, _cColF:{status:"",owner:""},
   _coSort:{col:"",dir:"asc"}, _coColF:{industry:"",owner:""}, _coTab:"all",
   _tSort:{col:"due",dir:"asc"}, _tColF:{priority:""},
-  _dSort:{col:"",dir:"asc"}, _dView:"", _pipeView:"bars", _dCloseF:"",
+  _dSort:{col:"",dir:"asc"}, _dView:"", _pipeView:"bars", _dCloseF:"", _dDateFrom:"", _dDateTo:"", _dealsTf: localStorage.getItem("pulse-deals-tf")||"all",
   _tkSort:{col:"createdAt",dir:"desc"}, _tkColF:{status:"",priority:""}, _tkSearch:"",
   _tmplSearch:"", _tmplCat:"",
   _dashTf: localStorage.getItem("pulse-dash-tf")||"30d",
@@ -1846,11 +1846,17 @@ function renderDeals(c){
   if(!state._pipeOri)state._pipeOri=localStorage.getItem("pulse-pipe-ori")||"h";
   if(!state._dView)state._dView=localStorage.getItem("pulse-deals-view")||"board";
   const ori=state._pipeOri,view=state._dView;
-  const D=live(state.deals);
+  const tf=state._dealsTf||"all";
+  const since=tfStart(tf);
+  const allD=live(state.deals);
+  const D=tf==="all"?allD:allD.filter(d=>(d.createdAt||0)>=since);
   const open=D.filter(d=>d.stage!=="Won"&&d.stage!=="Lost");
   const boardH=view==="board"&&ori==="h",boardV=view==="board"&&ori==="v",isList=view==="list";
+  const tfLabels={"7d":"Last 7 days","30d":"Last 30 days","90d":"Last 90 days","ytd":"Year to date","all":"All time"};
+  const tfBtns=Object.entries(tfLabels).map(([k,v])=>`<button class="btn sm${tf===k?" primary":""}" data-dealstf="${k}">${v}</button>`).join("");
+  const subLabel=tf==="all"?`${allD.length} total · ${open.length} open · ${moneyK(open.reduce((s,d)=>s+(+d.value||0),0))} in play`:`${D.length} deals in period · ${open.length} open · ${moneyK(open.reduce((s,d)=>s+(+d.value||0),0))} in play`;
   c.innerHTML=`
-    <div class="pagehead"><div><h1>Deals</h1><div class="sub">${D.length} total · ${open.length} open · ${moneyK(open.reduce((s,d)=>s+(+d.value||0),0))} in play</div></div>
+    <div class="pagehead"><div><h1>Deals</h1><div class="sub">${subLabel}</div></div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="display:flex;gap:2px">
           <button class="btn sm${boardH?" primary":""}" id="ori-h" title="Board (columns)" style="padding:5px 8px">${I.cols}</button>
@@ -1858,15 +1864,33 @@ function renderDeals(c){
           <button class="btn sm${isList?" primary":""}" id="ori-list" title="List view" style="padding:5px 8px">${I.list}</button>
         </div>
         <button class="btn primary" id="newd">${I.plus}<span>New deal</span></button></div></div>
+    <div class="toolbar" style="margin-bottom:8px">${tfBtns}</div>
     ${isList
       ?`<div class="toolbar"><div class="field-search">${I.search}<input id="dsearch" placeholder="Search deals, companies, owners…" value="${esc(state._dSearch||"")}"></div>
           <select class="input" id="dstage"><option value="">All stages</option>${stageList().map(s=>`<option value="${esc(s)}"${(state._dStageF||"")=== s?" selected":""}>${esc(s)}</option>`).join("")}</select>
           <select class="input" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${(state._dPrioF||"")=== p?" selected":""}>${esc(p)}</option>`).join("")}</select>
-          <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
+          <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option><option value="custom"${state._dCloseF==="custom"?" selected":""}>Custom range…</option></select></div>
+         <div id="daterange-row" style="display:${state._dCloseF==="custom"?"flex":"none"};align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap">
+           <span style="font-size:13px;color:var(--muted)">Close date from</span>
+           <input type="date" class="input" id="dfrom" value="${esc(state._dDateFrom||"")}" style="width:auto">
+           <span style="font-size:13px;color:var(--muted)">to</span>
+           <input type="date" class="input" id="dto" value="${esc(state._dDateTo||"")}" style="width:auto">
+         </div>
          <div class="card tablecard" id="dtable"></div>`
-      :`<div class="toolbar"><select class="input" id="bclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
+      :`<div class="toolbar"><div class="field-search">${I.search}<input id="bsearch" placeholder="Search deals, companies, owners…" value="${esc(state._bSearch||"")}"></div><select class="input" id="bclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option><option value="custom"${state._dCloseF==="custom"?" selected":""}>Custom range…</option></select></div>
+         <div id="bdaterange-row" style="display:${state._dCloseF==="custom"?"flex":"none"};align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap">
+           <span style="font-size:13px;color:var(--muted)">Close date from</span>
+           <input type="date" class="input" id="bdfrom" value="${esc(state._dDateFrom||"")}" style="width:auto">
+           <span style="font-size:13px;color:var(--muted)">to</span>
+           <input type="date" class="input" id="bdto" value="${esc(state._dDateTo||"")}" style="width:auto">
+         </div>
           <div class="board${ori==="v"?" vert":""}" id="board"></div>`}`;
   const setView=(v,o)=>{state._dView=v;if(o)state._pipeOri=o;try{localStorage.setItem("pulse-deals-view",v);if(o)localStorage.setItem("pulse-pipe-ori",o);}catch(_){}renderDeals(c);};
+  c.querySelectorAll("[data-dealstf]").forEach(btn=>btn.onclick=()=>{
+    state._dealsTf=btn.dataset.dealstf;
+    try{localStorage.setItem("pulse-deals-tf",state._dealsTf);}catch(_){}
+    renderDeals(c);
+  });
   $("#newd").onclick=()=>dealForm();
   $("#ori-h").onclick=()=>setView("board","h");
   $("#ori-v").onclick=()=>setView("board","v");
@@ -1877,6 +1901,8 @@ function renderDeals(c){
     const draw=()=>{
       const q=($("#dsearch").value||"").toLowerCase(),stg=$("#dstage").value,pr=$("#dprio").value,cf=$("#dclosedate").value;
       state._dSearch=q;state._dStageF=stg;state._dPrioF=pr;state._dCloseF=cf;
+      if(cf==="custom"){const dfEl=$("#dfrom"),dtEl=$("#dto");if(dfEl)state._dDateFrom=dfEl.value;if(dtEl)state._dDateTo=dtEl.value;const drEl=$("#daterange-row");if(drEl)drEl.style.display="flex";}
+      else{const drEl=$("#daterange-row");if(drEl)drEl.style.display="none";}
       const _now=Date.now();
       const _sow=_now-new Date().getDay()*864e5;const _eow=_sow+7*864e5;
       const _som=new Date();_som.setDate(1);_som.setHours(0,0,0,0);
@@ -1895,6 +1921,7 @@ function renderDeals(c){
         else if(cf==="30"){if(!d.expectedClose||d.expectedClose<_now||d.expectedClose>=_now+30*864e5)return false;}
         else if(cf==="set"){if(!d.expectedClose)return false;}
         else if(cf==="none"){if(d.expectedClose)return false;}
+        else if(cf==="custom"){const from=state._dDateFrom?new Date(state._dDateFrom).getTime():0;const to=state._dDateTo?new Date(state._dDateTo).getTime()+864e5-1:Infinity;if(!d.expectedClose||d.expectedClose<from||d.expectedClose>to)return false;}
         return true;
       });
       const sc=state._dSort.col,sd=state._dSort.dir;
@@ -1939,11 +1966,16 @@ function renderDeals(c){
       $("#dtable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();dealForm(b.dataset.edit);});
       const n2=$("#newd2");if(n2)n2.onclick=()=>dealForm();
     };
-    $("#dsearch").oninput=draw;$("#dstage").onchange=draw;$("#dprio").onchange=draw;$("#dclosedate").onchange=draw;draw();
+    $("#dsearch").oninput=draw;$("#dstage").onchange=draw;$("#dprio").onchange=draw;$("#dclosedate").onchange=draw;
+    const dfEl=$("#dfrom"),dtEl=$("#dto");if(dfEl)dfEl.onchange=draw;if(dtEl)dtEl.onchange=draw;
+    draw();
   } else {
     const bCloseEl=$("#bclosedate");
-    if(bCloseEl)bCloseEl.onchange=()=>{state._dCloseF=bCloseEl.value;renderDeals(c);};
-    const cf=state._dCloseF||"";
+    if(bCloseEl)bCloseEl.onchange=()=>{state._dCloseF=bCloseEl.value;const bdr=$("#bdaterange-row");if(bdr)bdr.style.display=bCloseEl.value==="custom"?"flex":"none";renderDeals(c);};
+    const bSearchEl=$("#bsearch");
+    if(bSearchEl)bSearchEl.oninput=()=>{state._bSearch=bSearchEl.value;renderDeals(c);};
+    const bdfEl=$("#bdfrom"),bdtEl=$("#bdto");if(bdfEl)bdfEl.onchange=()=>{state._dDateFrom=bdfEl.value;renderDeals(c);};if(bdtEl)bdtEl.onchange=()=>{state._dDateTo=bdtEl.value;renderDeals(c);};
+    const cf=state._dCloseF||"",bq=(state._bSearch||"").toLowerCase();
     const _now=Date.now();
     const _sow=_now-new Date().getDay()*864e5;const _eow=_sow+7*864e5;
     const _som=new Date();_som.setDate(1);_som.setHours(0,0,0,0);
@@ -1952,6 +1984,7 @@ function renderDeals(c){
     const _eoq=new Date(_soq.getFullYear(),_qm+3,1).getTime();
     const filterDeal=d=>{
       const dt=d.expectedClose||d.renewalDate||null;
+      if(bq){const co=companyById(d.companyId)?.name||"";if(!(d.name.toLowerCase().includes(bq)||co.toLowerCase().includes(bq)||(d.owner||"").toLowerCase().includes(bq)))return false;}
       if(cf==="overdue"){if(!dt||dt>=_now||d.stage==="Won"||d.stage==="Lost")return false;}
       else if(cf==="week"){if(!dt||dt<_sow||dt>=_eow)return false;}
       else if(cf==="month"){if(!dt||dt<_som.getTime()||dt>=_eom)return false;}
@@ -1959,8 +1992,12 @@ function renderDeals(c){
       else if(cf==="30"){if(!dt||dt<_now||dt>=_now+30*864e5)return false;}
       else if(cf==="set"){if(!dt)return false;}
       else if(cf==="none"){if(dt)return false;}
+      else if(cf==="custom"){const from=state._dDateFrom?new Date(state._dDateFrom).getTime():0;const to=state._dDateTo?new Date(state._dDateTo).getTime()+864e5-1:Infinity;if(!dt||dt<from||dt>to)return false;}
       return true;
     };
+    const bfEl=$("#bdfrom"),btEl=$("#bdto");
+    if(bfEl)bfEl.onchange=()=>{state._dDateFrom=bfEl.value;renderDeals(c);};
+    if(btEl)btEl.onchange=()=>{state._dDateTo=btEl.value;renderDeals(c);};
     const board=$("#board");
     board.innerHTML=stageList().map(s=>{
       const items=D.filter(d=>d.stage===s&&filterDeal(d)).sort((a,b)=>(a.order||0)-(b.order||0));
@@ -3582,9 +3619,11 @@ function quoteBuilderModal(prefill){
   };
   overlay.querySelector("#qbX").onclick=close;
   overlay.querySelector("#qbCancel").onclick=close;
-  overlay.querySelector("#qbSave").onclick=async()=>{
+  const saveBtn=overlay.querySelector("#qbSave");
+  saveBtn.onclick=async()=>{
     const q=collect();
     if(!q.integrations.length&&!q.users.count){toast("Select at least one integration or add users","err");return;}
+    saveBtn.disabled=true;saveBtn.textContent="Saving…";
     const company=companyById(overlay.querySelector("#qb-company").value);
     const name=(overlay.querySelector("#qb-qname").value.trim())||(company?company.name+" — Quote":"Untitled quote");
     const totals=computeQuoteTotals(q);
@@ -3601,8 +3640,10 @@ function quoteBuilderModal(prefill){
       totals,
     };
     const id=await dbAdd("quotes",rec);
-    if(id)logActivity("note",`Created quote "${name}" — impl ${money(totals.implementation)}, ${money(totals.monthly)}/mo`,rec.companyId?"company":null,rec.companyId||null);
-    close();
+    if(id){
+      logActivity("note",`Created quote "${name}" — impl ${money(totals.implementation)}, ${money(totals.monthly)}/mo`,rec.companyId?"company":null,rec.companyId||null);
+      close();
+    }else{saveBtn.disabled=false;saveBtn.innerHTML=`${I.calc}Save quote`;}
   };
   paint();
 }
