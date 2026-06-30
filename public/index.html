@@ -223,7 +223,6 @@
   .kcol-search input{border:none;background:none;font-size:11.5px;width:100%;outline:none;color:var(--ink);}
   .kcol-search input::placeholder{color:var(--faint);}
   .kcol-search svg{width:11px;height:11px;color:var(--faint);flex:none;}
-  .board.vert .kcol-search{display:none;}
   .dealcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 12px;cursor:grab;box-shadow:var(--shadow);transition:box-shadow .12s,transform .05s;display:flex;flex-direction:column;gap:7px;}
   .dealcard:active{cursor:grabbing;}
   .dealcard.dragging{opacity:.4;}
@@ -241,12 +240,14 @@
   /* horizontal kanban — fill viewport, scrollbar always visible */
   .board:not(.vert){align-items:stretch;overflow-y:hidden;}
   .board:not(.vert) .kcol{overflow-y:auto;}
-  /* vertical kanban */
-  .board-vert-wrap{overflow-x:auto;width:100%;padding-bottom:12px;scrollbar-width:thin;}
-  .board.vert{display:flex;flex-direction:column;overflow-x:visible;padding-bottom:0;width:max-content;min-width:100%;}
-  .board.vert .kcol{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;min-height:auto;gap:9px;overflow-x:visible;}
-  .board.vert .kcol-head{flex:none;width:132px;min-width:132px;flex-direction:column;align-items:flex-start;gap:4px;padding:4px 10px 4px 4px;border-right:2px solid var(--line);align-self:stretch;}
+  /* vertical kanban — 1 row per stage: label/search on the left, cards scroll horizontally */
+  .board-vert-wrap{overflow-x:hidden;width:100%;padding-bottom:12px;scrollbar-width:thin;}
+  .board.vert{display:flex;flex-direction:column;gap:13px;overflow-x:hidden;padding-bottom:0;width:auto;min-width:0;}
+  .board.vert .kcol{display:grid;grid-template-columns:140px minmax(0,1fr);grid-template-rows:auto auto;column-gap:0;row-gap:6px;align-items:start;min-height:auto;overflow:hidden;}
+  .board.vert .kcol-head{grid-column:1;grid-row:1;flex-direction:column;align-items:flex-start;gap:4px;padding:2px 10px 2px 4px;}
   .board.vert .kcol-head .tot{margin-left:0;}
+  .board.vert .kcol-search{grid-column:1;grid-row:2;display:flex;margin:0 10px 0 4px;}
+  .board.vert .kcol-cards{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:row;flex-wrap:nowrap;gap:9px;align-self:stretch;overflow-x:auto;padding:2px 2px 8px 12px;border-left:2px solid var(--line);scrollbar-width:thin;}
   .board.vert .dealcard{width:200px;flex:none;}
   .dealcard mark{background:#fef08a;color:inherit;border-radius:2px;padding:0 1px;font-style:normal;}
   .kcol-empty{text-align:center;padding:18px 8px;color:var(--muted);font-size:12px;}
