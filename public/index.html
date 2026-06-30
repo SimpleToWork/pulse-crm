@@ -526,7 +526,7 @@ const firebaseConfig = {
   messagingSenderId: "841081792490",
   appId: "1:841081792490:web:54617faa9bd87ed991b493"
 };
-const AI_ENDPOINT = "https://pulse-crm-blush.vercel.app/api/claude";       // co-located Vercel function — same-origin, no CORS
+const AI_ENDPOINT = "/api/claude";       // co-located Vercel function — relative path keeps this same-origin on any deployment
 // Only Google accounts on this Workspace domain may sign in. Set "" to allow ANY Google account.
 const ALLOWED_DOMAIN = "merchantsbi.com";
 /* ==================================================== */
@@ -661,7 +661,7 @@ const I={
 /* ---------------- state ---------------- */
 const state={ page:"dashboard", detail:null, user:null,
   contacts:[], companies:[], deals:[], tasks:[], activities:[], members:[], tickets:[], products:[], templates:[],
-  supportCategories:[], slaRules:[], quotes:[], quoteSettings:[],
+  supportCategories:[], slaRules:[], quotes:[], quoteSettings:[], pipelineStages:[],
   _qSort:{col:"createdAt",dir:"desc"}, _qSearch:"",
   theme: localStorage.getItem("pulse-theme")||"light", aiOpen:false, aiLog:[], cmdk:false, sideOpen:false,
   navCollapsed: localStorage.getItem("pulse-nav-collapsed")==="1",
@@ -687,6 +687,11 @@ const state={ page:"dashboard", detail:null, user:null,
   _aiCostPerUser: parseFloat(localStorage.getItem("pulse-ai-cost-per-user"))||0 };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
+
+/* dynamic stage helpers — fall back to compile-time constants when no custom stages are saved */
+function stageList(){const ps=live(state.pipelineStages);if(!ps.length)return STAGES;return[...ps].sort((a,b)=>(a.order||0)-(b.order||0)).map(s=>s.name);}
+function stageColor(name){const ps=live(state.pipelineStages);if(!ps.length)return STAGE_COLOR[name]||"#94a3b8";const s=ps.find(x=>x.name===name);return(s&&s.color)||STAGE_COLOR[name]||"#94a3b8";}
+function stageProb(name){const ps=live(state.pipelineStages);if(!ps.length)return STAGE_PROB[name]!=null?STAGE_PROB[name]:0;const s=ps.find(x=>x.name===name);return s!=null?(s.probability!=null?s.probability:0):(STAGE_PROB[name]!=null?STAGE_PROB[name]:0);}
 
 /* ---------------- helpers ---------------- */
 const $=(s,r=document)=>r.querySelector(s);
@@ -1412,15 +1417,19 @@ function renderDashboard(c){
   // collect unique owners from deals for the filter dropdown
   const owners=[...new Set(allDeals.map(d=>d.owner||"").filter(Boolean))].sort();
   const selOwner=state._dashOwner||"";
-  // scope deals by timeframe first, then by owner
-  const Dtf=tf==="all"?allDeals:allDeals.filter(d=>(d.createdAt||0)>=since||(d.updatedAt||0)>=since);
+  // scope open deals by createdAt; won/lost by closedAt so edits don't shift them between periods
+  const Dtf=tf==="all"?allDeals:allDeals.filter(d=>(d.createdAt||0)>=since);
   const D=selOwner?Dtf.filter(d=>(d.owner||"")===selOwner):Dtf;
   const Ctf=tf==="all"?C:C.filter(x=>(x.createdAt||0)>=since);
   const open=D.filter(d=>d.stage!=="Won"&&d.stage!=="Lost");
-  const won=D.filter(d=>d.stage==="Won"), lost=D.filter(d=>d.stage==="Lost");
+  const allLiveWon=live(state.deals).filter(d=>d.stage==="Won"), allLiveLost=live(state.deals).filter(d=>d.stage==="Lost");
+  const wonTf=tf==="all"?allLiveWon:allLiveWon.filter(d=>(d.closedAt||d.createdAt||0)>=since);
+  const lostTf=tf==="all"?allLiveLost:allLiveLost.filter(d=>(d.closedAt||d.createdAt||0)>=since);
+  const won=selOwner?wonTf.filter(d=>(d.owner||"")===selOwner):wonTf;
+  const lost=selOwner?lostTf.filter(d=>(d.owner||"")===selOwner):lostTf;
   const pipeVal=open.reduce((s,d)=>s+(+d.value||0),0);
   const wonVal=won.reduce((s,d)=>s+(+d.value||0),0);
-  const forecast=open.reduce((s,d)=>s+(+d.value||0)*(STAGE_PROB[d.stage]||0)/100,0);
+  const forecast=open.reduce((s,d)=>s+(+d.value||0)*(stageProb(d.stage)||0)/100,0);
   const winRate=(won.length+lost.length)?Math.round(won.length/(won.length+lost.length)*100):0;
   const dueToday=T.filter(t=>t.status!=="done"&&isToday(t.due)).length;
   const overdue=T.filter(t=>t.status!=="done"&&isOverdue(t.due)).length;
@@ -1430,7 +1439,7 @@ function renderDashboard(c){
 
   // pipeline view helpers
   const pv=state._pipeView||"bars";
-  const activeStages=STAGES.filter(s=>s!=="Won"&&s!=="Lost");
+  const activeStages=stageList().filter(s=>s!=="Won"&&s!=="Lost");
 
   // view: horizontal bars by value (default)
   const barsView=()=>{
@@ -1438,7 +1447,7 @@ function renderDashboard(c){
     return activeStages.map(s=>{
       const v=open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0), cnt=open.filter(d=>d.stage===s).length;
       return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:500">${esc(s)}</span><span class="muted">${moneyK(v)} &middot; ${cnt}</span></div>
-        <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(2,v/maxV*100)}%;background:${STAGE_COLOR[s]};border-radius:5px;transition:width .4s"></div></div></div>`;
+        <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(2,v/maxV*100)}%;background:${stageColor(s)};border-radius:5px;transition:width .4s"></div></div></div>`;
     }).join("");
   };
 
@@ -1448,13 +1457,13 @@ function renderDashboard(c){
     return activeStages.map(s=>{
       const cnt=open.filter(d=>d.stage===s).length;
       return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:500">${esc(s)}</span><span class="muted">${cnt} deal${cnt!==1?"s":""}</span></div>
-        <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(cnt?2:0,cnt/maxC*100)}%;background:${STAGE_COLOR[s]};border-radius:5px;transition:width .4s"></div></div></div>`;
+        <div style="height:8px;background:var(--surface-2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.max(cnt?2:0,cnt/maxC*100)}%;background:${stageColor(s)};border-radius:5px;transition:width .4s"></div></div></div>`;
     }).join("");
   };
 
   // view: SVG donut chart by value
   const donutView=()=>{
-    const sd=activeStages.map(s=>({s,v:open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0),c:STAGE_COLOR[s]})).filter(d=>d.v>0);
+    const sd=activeStages.map(s=>({s,v:open.filter(d=>d.stage===s).reduce((a,d)=>a+(+d.value||0),0),c:stageColor(s)})).filter(d=>d.v>0);
     if(!sd.length) return emptyMini("No open deals","Add a deal to see your pipeline.");
     const tot=sd.reduce((a,d)=>a+d.v,0)||1;
     const R=65,r=38,cx=80,cy=80; let ang=-90;
@@ -1851,7 +1860,7 @@ function renderDeals(c){
         <button class="btn primary" id="newd">${I.plus}<span>New deal</span></button></div></div>
     ${isList
       ?`<div class="toolbar"><div class="field-search">${I.search}<input id="dsearch" placeholder="Search deals, companies, owners…" value="${esc(state._dSearch||"")}"></div>
-          <select class="input" id="dstage"><option value="">All stages</option>${STAGES.map(s=>`<option value="${esc(s)}"${(state._dStageF||"")=== s?" selected":""}>${esc(s)}</option>`).join("")}</select>
+          <select class="input" id="dstage"><option value="">All stages</option>${stageList().map(s=>`<option value="${esc(s)}"${(state._dStageF||"")=== s?" selected":""}>${esc(s)}</option>`).join("")}</select>
           <select class="input" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${(state._dPrioF||"")=== p?" selected":""}>${esc(p)}</option>`).join("")}</select>
           <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
          <div class="card tablecard" id="dtable"></div>`
@@ -1893,7 +1902,7 @@ function renderDeals(c){
         let av,bv;
         if(sc==="name"){av=(a.name||"").toLowerCase();bv=(b.name||"").toLowerCase();}
         else if(sc==="company"){av=(companyById(a.companyId)?.name||"").toLowerCase();bv=(companyById(b.companyId)?.name||"").toLowerCase();}
-        else if(sc==="stage"){av=STAGES.indexOf(a.stage);bv=STAGES.indexOf(b.stage);}
+        else if(sc==="stage"){av=stageList().indexOf(a.stage);bv=stageList().indexOf(b.stage);}
         else if(sc==="value"){av=+a.value||0;bv=+b.value||0;}
         else if(sc==="priority"){av=PRIORITIES.indexOf(a.priority||"low");bv=PRIORITIES.indexOf(b.priority||"low");}
         else if(sc==="expectedClose"){av=a.expectedClose||0;bv=b.expectedClose||0;}
@@ -1916,7 +1925,7 @@ function renderDeals(c){
           ${rows.map(d=>`<tr data-id="${d.id}">
             <td><div style="font-weight:600;font-size:13px">${esc(d.name)}</div></td>
             <td>${esc(companyById(d.companyId)?.name||"—")}</td>
-            <td><span class="chip"><span class="dot" style="background:${STAGE_COLOR[d.stage]||"#94a3b8"}"></span>${esc(d.stage)}</span></td>
+            <td><span class="chip"><span class="dot" style="background:${stageColor(d.stage)}"></span>${esc(d.stage)}</span></td>
             <td style="font-weight:600">${money(d.value)}</td>
             <td><span class="prio ${d.priority||"low"}">${esc(d.priority||"low")}</span></td>
             <td class="muted">${fmtDate(d.expectedClose)}</td>
@@ -1953,11 +1962,11 @@ function renderDeals(c){
       return true;
     };
     const board=$("#board");
-    board.innerHTML=STAGES.map(s=>{
+    board.innerHTML=stageList().map(s=>{
       const items=D.filter(d=>d.stage===s&&filterDeal(d)).sort((a,b)=>(a.order||0)-(b.order||0));
       const tot=items.reduce((a,d)=>a+(+d.value||0),0);
       return `<div class="kcol" data-stage="${esc(s)}">
-        <div class="kcol-head"><span class="dot" style="background:${STAGE_COLOR[s]}"></span><span class="nm">${s}</span><span class="ct">${items.length}</span><span class="tot">${moneyK(tot)}</span></div>
+        <div class="kcol-head"><span class="dot" style="background:${stageColor(s)}"></span><span class="nm">${s}</span><span class="ct">${items.length}</span><span class="tot">${moneyK(tot)}</span></div>
         ${items.map(d=>dealCard(d)).join("")}</div>`;
     }).join("");
     board.querySelectorAll(".dealcard").forEach(card=>{
@@ -1971,7 +1980,7 @@ function renderDeals(c){
       col.ondragleave=()=>col.classList.remove("dragover");
       col.ondrop=e=>{e.preventDefault();col.classList.remove("dragover");
         const id=e.dataTransfer.getData("text/plain");const d=state.deals.find(x=>x.id===id);const ns=col.dataset.stage;
-        if(d&&d.stage!==ns){ const old=d.stage; const patch={stage:ns,probability:STAGE_PROB[ns]}; if(ns==="Won"||ns==="Lost")patch.closedAt=Date.now();
+        if(d&&d.stage!==ns){ const old=d.stage; const patch={stage:ns,probability:stageProb(ns)}; if(ns==="Won"||ns==="Lost")patch.closedAt=Date.now();
           dbUpdate("deals",id,patch,true); logActivity("stage",`Deal "${d.name}" moved ${old} → ${ns}`,"deal",id); notifySlack(`:arrows_counterclockwise: *Deal stage changed*: "${d.name}" moved from *${old}* → *${ns}* (${money(d.value)})`); toast(`Moved to ${ns}`,"ok"); }
       };
     });
@@ -2515,6 +2524,90 @@ function openTemplateForm(id,contentEl){
   };
 }
 
+/* ---------- Pipeline stage management ---------- */
+function initPipelineStagesUI(c){
+  const psList=c.querySelector("#ps-list");
+  if(!psList)return;
+  const hasCustom=live(state.pipelineStages).length>0;
+  let stages=hasCustom
+    ?[...live(state.pipelineStages)].sort((a,b)=>(a.order||0)-(b.order||0)).map(s=>({...s}))
+    :STAGES.map((name,i)=>({name,color:STAGE_COLOR[name]||"#94a3b8",probability:STAGE_PROB[name]||0,order:i}));
+  const PROTECTED=["Won","Lost"];
+  function renderList(){
+    psList.innerHTML=stages.map((s,i)=>`
+      <div class="ps-row" draggable="true" data-idx="${i}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface-2);border-radius:var(--r-sm);cursor:grab;user-select:none;border:1px solid var(--line)">
+        <span style="color:var(--faint);font-size:16px;cursor:grab;flex:none">&#8801;</span>
+        <input type="color" value="${esc(s.color)}" data-color="${i}" title="Stage color" style="width:26px;height:26px;border:none;border-radius:50%;cursor:pointer;padding:2px;background:none;flex:none">
+        <span style="font-size:13px;font-weight:600;flex:1;min-width:80px">${esc(s.name)}</span>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);flex:none">
+          <input type="number" value="${s.probability!=null?s.probability:0}" min="0" max="100" data-prob="${i}" style="width:50px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--surface);color:var(--ink);text-align:right">
+          <span>%</span>
+        </label>
+        ${PROTECTED.includes(s.name)?`<span style="font-size:11px;color:var(--faint);font-weight:600;padding:2px 7px;border:1px solid var(--line);border-radius:20px;flex:none">fixed</span>`:`<button data-del="${i}" title="Remove stage" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:3px;font-size:14px;flex:none;line-height:1">&#10005;</button>`}
+      </div>`).join("");
+    psList.querySelectorAll("input[data-color]").forEach(inp=>inp.oninput=e=>{stages[+e.target.dataset.color].color=e.target.value;});
+    psList.querySelectorAll("input[data-prob]").forEach(inp=>inp.oninput=e=>{stages[+e.target.dataset.prob].probability=parseInt(e.target.value)||0;});
+    psList.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+      const idx=+b.dataset.del,name=stages[idx].name;
+      const inUse=live(state.deals).filter(d=>d.stage===name).length;
+      if(inUse&&!confirm(`"${name}" is used by ${inUse} deal(s). Remove it anyway?`))return;
+      stages.splice(idx,1);renderList();
+    });
+    let dragIdx=null;
+    psList.querySelectorAll(".ps-row").forEach((row,i)=>{
+      row.ondragstart=e=>{dragIdx=i;row.style.opacity=".4";e.dataTransfer.effectAllowed="move";};
+      row.ondragend=()=>{psList.querySelectorAll(".ps-row").forEach(r=>{r.style.opacity="";r.style.outline="";});};
+      row.ondragover=e=>{e.preventDefault();if(dragIdx!==null&&dragIdx!==i)row.style.outline="2px solid var(--accent)";};
+      row.ondragleave=()=>{row.style.outline="";};
+      row.ondrop=e=>{
+        e.preventDefault();row.style.outline="";
+        if(dragIdx===null||dragIdx===i)return;
+        const moved=stages.splice(dragIdx,1)[0];stages.splice(i,0,moved);dragIdx=null;renderList();
+      };
+    });
+  }
+  renderList();
+  const psAdd=c.querySelector("#ps-add");
+  if(psAdd)psAdd.onclick=()=>{
+    const name=prompt("New stage name:");
+    if(!name||!name.trim())return;
+    const trimmed=name.trim();
+    if(stages.some(s=>s.name===trimmed)){toast("A stage with that name already exists","err");return;}
+    stages.push({name:trimmed,color:"#5b5bf0",probability:50,order:stages.length});
+    renderList();toast(`Stage "${trimmed}" added — click Save to persist`,"ok");
+  };
+  const psReset=c.querySelector("#ps-reset");
+  if(psReset)psReset.onclick=()=>{
+    if(!confirm("Reset to default pipeline stages? Any customizations will be lost."))return;
+    stages=STAGES.map((name,i)=>({name,color:STAGE_COLOR[name]||"#94a3b8",probability:STAGE_PROB[name]||0,order:i}));
+    renderList();toast("Defaults loaded — click Save to persist","ok");
+  };
+  const psSave=c.querySelector("#ps-save");
+  if(psSave)psSave.onclick=async()=>{
+    psSave.disabled=true;psSave.textContent="Saving…";
+    try{await savePipelineStages(stages);}finally{psSave.disabled=false;psSave.innerHTML=I.check+"Save order & colors";}
+  };
+}
+async function savePipelineStages(stages){
+  if(fbReady){
+    const existing=live(state.pipelineStages);
+    for(const s of existing)await updateDoc(doc(db,"pipelineStages",s.id),{deletedAt:Date.now()});
+    for(let i=0;i<stages.length;i++){
+      const {name,color,probability}=stages[i];
+      await addDoc(collection(db,"pipelineStages"),{name,color,probability:probability||0,order:i,createdAt:Date.now(),updatedAt:Date.now(),createdBy:state.user?.email||"",deletedAt:null});
+    }
+    toast("Pipeline stages saved","ok");
+  }else{
+    state.pipelineStages.forEach(s=>{s.deletedAt=Date.now();});
+    let seq=Date.now();
+    for(let i=0;i<stages.length;i++){
+      const {name,color,probability}=stages[i];
+      state.pipelineStages.push({id:"ps-"+(seq++),name,color,probability:probability||0,order:i,createdAt:Date.now(),updatedAt:Date.now(),createdBy:"demo",deletedAt:null});
+    }
+    toast("Pipeline stages saved (demo — not persisted across refresh)","ok");render();
+  }
+}
+
 function renderSettings(c){
   const m=state.members.length?state.members:[{name:state.user.name,email:state.user.email,role:"Owner"}];
   const prods=live(state.products);
@@ -2522,13 +2615,12 @@ function renderSettings(c){
   const intPricing=getQuoteSettings();
   c.innerHTML=`
     <div class="pagehead"><div><h1>Settings</h1><div class="sub">Workspace, team & integrations</div></div></div>
-    <div class="grid2">
-      <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card panel"><div class="panel-head"><h2>Team members</h2><button class="btn sm" id="addmember">${I.plus}Invite</button></div>
           ${m.map(p=>`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line)">${ava(p.name||p.email,30)}<div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(p.name||p.email)}</div><div class="faint" style="font-size:11.5px">${esc(p.email||"")}</div></div><span class="chip">${esc(p.role||"Sales Rep")}</span></div>`).join("")}</div>
-        <div class="card panel"><div class="panel-head"><h2>Pipeline stages</h2></div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">${STAGES.map(s=>`<span class="chip"><span class="dot" style="background:${STAGE_COLOR[s]}"></span>${s}</span>`).join("")}</div>
-          <div class="faint" style="font-size:12px;margin-top:10px">Stage customization ships in a later phase.</div></div>
+        <div class="card panel" id="pipeline-stages-panel"><div class="panel-head"><h2>Pipeline stages</h2><div style="display:flex;gap:6px"><button class="btn sm" id="ps-reset">${I.spark}Reset to defaults</button><button class="btn sm primary" id="ps-add">${I.plus}Add stage</button></div></div>
+          <div id="ps-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;align-items:center"><button class="btn sm primary" id="ps-save">${I.check}Save order &amp; colors</button><span class="faint" style="font-size:12px">Drag rows to reorder. Changes apply instantly across all views after saving.</span></div></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="card panel"><div class="panel-head"><h2>Appearance</h2></div>
@@ -2577,7 +2669,10 @@ function renderSettings(c){
         </div>
         <div class="card panel"><div class="panel-head"><h2>Data</h2></div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">${fbReady?"Connected to Firestore — changes persist in real time.":"Demo mode — configure Firebase in index.html to persist data."}</div>
-          <button class="btn" id="seedbtn">${I.spark}${live(state.contacts).length?"Re-seed 500 contacts, 75 companies &amp; 90 deals":"Seed 500 contacts, 75 companies &amp; 90 deals"}</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn" id="seedbtn">${I.spark}${live(state.contacts).length?"Re-seed 500 contacts, 75 companies &amp; 90 deals":"Seed 500 contacts, 75 companies &amp; 90 deals"}</button>
+            ${live(state.contacts).filter(r=>r.seeded).length?`<button class="btn danger" id="clearseedbtn" title="Remove all seeded contacts, companies, deals, tasks, activities and tickets">${I.trash}Drop seed data</button>`:""}
+          </div>
           <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px"><div style="font-size:13px;font-weight:600;margin-bottom:8px">Bulk import</div>
           <div class="faint" style="font-size:12px;margin-bottom:10px">Import thousands of contacts, companies, or leads at once. Download a template, fill it in, then upload. Supports 10,000+ records per import.</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2593,7 +2688,6 @@ function renderSettings(c){
         ${renderEtlCard()}
         ${renderApolloCard()}
         ${renderSlackCard()}
-      </div>
     </div>
     <div class="card panel" style="margin-top:14px">
       <div class="panel-head"><h2>Product Offering</h2><button class="btn sm primary" id="addproduct">${I.plus}Add product</button></div>
@@ -2633,12 +2727,14 @@ function renderSettings(c){
       </table></div>
     </div>`;
   c.querySelectorAll("[data-theme-set]").forEach(b=>b.onclick=()=>{state.theme=b.dataset.themeSet;localStorage.setItem("pulse-theme",state.theme);render();});
+  initPipelineStagesUI(c);
   $("#addmember").onclick=()=>memberForm();
   const aiCostSave=$("#ai-cost-save");
   if(aiCostSave)aiCostSave.onclick=async()=>{const v=parseFloat(document.getElementById("ai-cost-input")?.value)||0;state._aiCostPerUser=v;localStorage.setItem("pulse-ai-cost-per-user",v);const qs=live(state.quoteSettings)[0];if(fbReady){if(qs)await dbUpdate("quoteSettings",qs.id,{aiCostOverride:v});else await dbAdd("quoteSettings",{ai:{...DEFAULT_AI},integrations:DEFAULT_INTEGRATIONS.map(x=>({...x})),aiCostOverride:v});}toast("AI cost assumption saved","ok");render();};
   const clayBtn=$("#clay-copy");
   if(clayBtn)clayBtn.onclick=()=>{const url=$("#clay-url-text")?.textContent||"";navigator.clipboard?.writeText(url).then(()=>{clayBtn.textContent="Copied!";setTimeout(()=>{clayBtn.textContent="Copy";},1500);}).catch(()=>{});}
-  const sd=$("#seedbtn");if(sd)sd.onclick=()=>{ if(fbReady)seedLive(sd); else{seedDemo();toast("Sample data loaded","ok");} };
+  const sd=$("#seedbtn");if(sd)sd.onclick=()=>{ if(fbReady)seedLive(sd); else{seedDemo();toast("Sample data loaded","ok");render();} };
+  const csd=$("#clearseedbtn");if(csd)csd.onclick=()=>clearSeedData(csd);
   $("#dl-contacts-tmpl").onclick=()=>downloadCSVTemplate("contacts");
   $("#dl-companies-tmpl").onclick=()=>downloadCSVTemplate("companies");
   $("#dl-leads-tmpl").onclick=()=>downloadCSVTemplate("leads");
@@ -2941,7 +3037,7 @@ function contactForm(id, defaults={}){
   const x=id?contactById(id):defaults;
   const coSelect=`<select id="c_company">${companyOptions().map(o=>`<option value="${esc(o.v)}" ${o.v==(x.companyId||"")?"selected":""}>${esc(o.l)}</option>`).join("")}</select>`;
   const companyField=!id
-    ?`<div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Company<button type="button" id="c_newco_toggle" class="btn sm" style="font-size:11px;padding:2px 8px">＋ New</button></label>${coSelect}</div>
+    ?`<div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Company<button type="button" id="c_newco_toggle" class="btn sm" style="font-size:11px;padding:2px 8px">＋ New</button></label><input type="text" id="c_company_search" placeholder="Search companies…" autocomplete="off" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r-sm) var(--r-sm) 0 0;border-bottom:none;background:var(--surface);color:var(--text);font-size:13px;margin-top:4px">${coSelect}</div>
       <div id="c_newco_section" style="display:none;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;margin-top:-6px;margin-bottom:2px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">New company</div>
         ${field("c_newco_name","Company name",{ph:"Acme Inc"})}
@@ -2953,7 +3049,7 @@ function contactForm(id, defaults={}){
     <div class="field-row">${companyField}${field("c_status","Status",{type:"select",value:x.status||"Lead",options:["Lead","Qualified","Customer","Churned","Inactive"]})}</div>
     <div class="field-row">${field("c_source","Lead source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}${field("c_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
     ${field("c_tags","Tags (comma separated)",{value:(x.tags||[]).join(", ")})}
-    ${field("c_notes","Notes",{type:"textarea",value:x.notes})}`;
+    <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Notes<button type="button" id="c_dictate" class="btn sm" style="font-size:11px;padding:2px 8px" title="Dictate notes">🎤 Dictate</button></label><textarea id="c_notes">${esc(x.notes||"")}</textarea><div id="c_dictate_status" style="display:none;font-size:11px;color:var(--muted);margin-top:3px"></div></div>`;
   openDrawer(id?"Edit contact":"New contact",body,async()=>{
     let companyId=val("c_company")||null;
     if(!id){
@@ -2974,8 +3070,45 @@ function contactForm(id, defaults={}){
     } else {await dbUpdate("contacts",id,data);}
   });
   if(!id)setTimeout(()=>{
-    const btn=document.getElementById("c_newco_toggle"),sec=document.getElementById("c_newco_section"),sel=document.getElementById("c_company");
-    if(btn&&sec&&sel)btn.onclick=()=>{const show=sec.style.display==="none";sec.style.display=show?"block":"none";btn.textContent=show?"✕ Cancel":"＋ New";sel.disabled=show;if(show){const inp=sec.querySelector("input");if(inp)inp.focus();}};
+    const btn=document.getElementById("c_newco_toggle"),sec=document.getElementById("c_newco_section"),sel=document.getElementById("c_company"),srch=document.getElementById("c_company_search");
+    if(srch&&sel){
+      const allOpts=companyOptions();
+      srch.oninput=()=>{const q=srch.value.toLowerCase();const cur=sel.value;const f=q?allOpts.filter(o=>!o.v||o.l.toLowerCase().includes(q)):allOpts;sel.innerHTML=f.map(o=>`<option value="${esc(o.v)}"${o.v===cur?` selected`:``}>${esc(o.l)}</option>`).join("");};
+    }
+    if(btn&&sec&&sel)btn.onclick=()=>{const show=sec.style.display==="none";sec.style.display=show?"block":"none";btn.textContent=show?"✕ Cancel":"＋ New";sel.disabled=show;if(srch)srch.disabled=show;if(show){const inp=sec.querySelector("input");if(inp)inp.focus();}};
+  },50);
+  setTimeout(()=>{
+    const mic=document.getElementById("c_dictate"),status=document.getElementById("c_dictate_status"),ta=document.getElementById("c_notes");
+    if(!mic||!ta)return;
+    let mr=null,chunks=[];
+    mic.onclick=async()=>{
+      if(mr&&mr.state==="recording"){mr.stop();return;}
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        chunks=[];
+        mr=new MediaRecorder(stream);
+        mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+        mr.onstop=async()=>{
+          stream.getTracks().forEach(t=>t.stop());
+          mic.disabled=true;mic.textContent="⏳";
+          if(status){status.style.display="block";status.textContent="Transcribing...";}
+          try{
+            const blob=new Blob(chunks,{type:mr.mimeType||"audio/webm"});
+            const arr=await blob.arrayBuffer();
+            const b64=btoa(new Uint8Array(arr).reduce((s,b)=>s+String.fromCharCode(b),""));
+            const r=await fetch("/api/transcribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({audio:b64,mimeType:mr.mimeType||"audio/webm"})});
+            const d=await r.json();
+            if(d.text){const cur=ta.value;ta.value=(cur?cur+"\n":"")+d.text;if(status)status.textContent="Done.";}
+            else if(d.error){if(status)status.textContent="Error: "+d.error;}
+          }catch(err){if(status)status.textContent="Error: "+err.message;}
+          mic.disabled=false;mic.textContent="🎙️ Dictate";
+          if(status)setTimeout(()=>{status.style.display="none";},3000);
+        };
+        mr.start();
+        mic.textContent="⏹️ Stop";
+        if(status){status.style.display="block";status.textContent="Recording…";}
+      }catch(e){toast("Microphone access denied","err");}
+    };
   },50);
 }
 function companyForm(id){
@@ -3034,7 +3167,7 @@ function dealForm(id,defaults={}){
   const x=id?state.deals.find(d=>d.id===id):defaults;
   const contactOpts=[{v:"",l:"— None —"},...live(state.contacts).map(c=>({v:c.id,l:contactName(c)}))];
   const body=`${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
-    <div class="field-row">${field("d_value","Value (USD)",{value:x.value,type:"number"})}${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:STAGES})}</div>
+    <div class="field-row">${field("d_value","Value (USD)",{value:x.value,type:"number"})}${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:stageList()})}</div>
     <div class="field-row">${field("d_company","Company",{type:"select",value:x.companyId,options:companyOptions()})}${field("d_contact","Primary contact",{type:"select",value:x.contactId,options:contactOpts})}</div>
     <div class="field-row">${field("d_prio","Priority",{type:"select",value:x.priority||"medium",options:PRIORITIES})}${field("d_close","Expected close",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}</div>
     <div class="field-row">${field("d_renewal","Renewal date",{type:"date",value:x.renewalDate?new Date(x.renewalDate).toISOString().slice(0,10):""})}${field("d_source","Source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}</div>
@@ -3049,13 +3182,13 @@ function dealForm(id,defaults={}){
   openDrawer(id?"Edit deal":"New deal",body,async()=>{
     const stage=val("d_stage");
     const data={name:val("d_name"),value:+val("d_value")||0,stage,companyId:val("d_company")||null,contactId:val("d_contact")||null,
-      priority:val("d_prio"),source:val("d_source"),owner:val("d_owner"),dataSources:multiVals("d_datasources"),notes:val("d_notes"),probability:STAGE_PROB[stage],
+      priority:val("d_prio"),source:val("d_source"),owner:val("d_owner"),dataSources:multiVals("d_datasources"),notes:val("d_notes"),probability:stageProb(stage),
       products:getFormProducts(),
       expectedClose:val("d_close")?new Date(val("d_close")).getTime():null,
       renewalDate:val("d_renewal")?new Date(val("d_renewal")).getTime():null};
     if(!data.name){toast("Deal name is required","err");return false;}
-    if(id){const old=state.deals.find(d=>d.id===id);await dbUpdate("deals",id,data);if(old&&old.stage!==stage){logActivity("stage",`Deal "${data.name}" moved ${old.stage} → ${stage}`,"deal",id);notifySlack(`:arrows_counterclockwise: *Deal stage changed*: "${data.name}" moved from *${old.stage}* → *${stage}* (${money(data.value)})`);}}
-    else{const nid=await dbAdd("deals",data);logActivity("deal",`Created deal "${data.name}" (${money(data.value)})`,"deal",nid);notifySlack(`:tada: *New deal created*: "${data.name}" — ${money(data.value)} · Stage: ${stage}${data.owner?" · Owner: "+data.owner:""}`);}
+    if(id){const old=state.deals.find(d=>d.id===id);if((stage==="Won"||stage==="Lost")&&old?.stage!==stage)data.closedAt=Date.now();await dbUpdate("deals",id,data);if(old&&old.stage!==stage){logActivity("stage",`Deal "${data.name}" moved ${old.stage} → ${stage}`,"deal",id);notifySlack(`:arrows_counterclockwise: *Deal stage changed*: "${data.name}" moved from *${old.stage}* → *${stage}* (${money(data.value)})`);}}
+    else{if(stage==="Won"||stage==="Lost")data.closedAt=Date.now();const nid=await dbAdd("deals",data);logActivity("deal",`Created deal "${data.name}" (${money(data.value)})`,"deal",nid);notifySlack(`:tada: *New deal created*: "${data.name}" — ${money(data.value)} · Stage: ${stage}${data.owner?" · Owner: "+data.owner:""}`);}
   });
   // wire product lines (always)
   setTimeout(()=>{
@@ -3315,7 +3448,9 @@ function quoteBuilderModal(prefill){
         </div>
         <div class="qb-section">
           <div class="qb-h">1 · Integrations <span class="qb-h-sub">click to select · use ＋ / − for multiple accounts</span></div>
+          <div style="margin-bottom:8px"><input id="qb-int-search" type="search" placeholder="Search integrations…" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:13px;" autocomplete="off"></div>
           <div class="qb-int">${intCards}</div>
+          <div id="qb-int-empty" style="display:none;font-size:12px;color:var(--faint);padding:8px 0">No integrations match your search.</div>
         </div>
         <div class="qb-section">
           <div class="qb-h">2 · Users &amp; AI</div>
@@ -3405,6 +3540,20 @@ function quoteBuilderModal(prefill){
     e.stopPropagation();const id=btn.dataset.id;const cur=sel[id]||0;
     sel[id]=btn.dataset.step==="+"?cur+1:Math.max(0,cur-1);paint();
   });
+  // integration search filter
+  const intSearch=overlay.querySelector("#qb-int-search");
+  const intEmpty=overlay.querySelector("#qb-int-empty");
+  intSearch.oninput=()=>{
+    const q=intSearch.value.trim().toLowerCase();
+    let visible=0;
+    box.querySelectorAll("[data-int-id]").forEach(card=>{
+      const name=(card.querySelector(".qb-name")||{}).textContent||"";
+      const show=!q||name.toLowerCase().includes(q);
+      card.style.display=show?"":"none";
+      if(show)visible++;
+    });
+    intEmpty.style.display=visible===0?"":"none";
+  };
   ["qb-users","qb-price","qb-data"].forEach(id=>{const e=overlay.querySelector("#"+id);if(e)e.oninput=paint;});
   overlay.querySelector("#qb-mult").onchange=paint;
   overlay.querySelector("#qb-bundle").oninput=()=>{bundleTouched=true;paint();};
@@ -3668,6 +3817,7 @@ function memberForm(){
   openDrawer("Invite team member",field("m_name","Name",{})+field("m_email","Email",{type:"email"})+
     field("m_role","Role",{type:"select",value:"Sales Rep",options:["Owner","Admin","Manager","Sales Rep","Viewer"]}),
     async()=>{const name=val("m_name"),email=val("m_email");if(!email){toast("Email required","err");return false;}
+      if(!state.members.length&&state.user)await dbAdd("members",{name:state.user.name,email:state.user.email,role:"Owner"},true);
       await dbAdd("members",{name,email,role:val("m_role")});},"Invite");
 }
 function productForm(id){
@@ -3850,7 +4000,7 @@ function doSignOut(){ if(fbReady)signOut(auth); else {state.user=null;render();}
    FIRESTORE WIRING / DEMO SEED
 ==================================================================== */
 function subscribe(){
-  const colls=["contacts","companies","deals","tasks","activities","members","tickets","products","templates","supportCategories","slaRules","quotes","quoteSettings"];
+  const colls=["contacts","companies","deals","tasks","activities","members","tickets","products","templates","supportCategories","slaRules","quotes","quoteSettings","pipelineStages"];
   colls.forEach(name=>onSnapshot(collection(db,name),snap=>{
     state[name]=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}}
@@ -3935,10 +4085,44 @@ function seedDemo(){
       value:vals[i%vals.length]+i*300,stage,probability:STAGE_PROB[stage],priority:PRIORITIES[i%3],source:sources[i%sources.length],owner:reps[i%reps.length],
       expectedClose:closed?now-daysAgo*DAY:now+(i%12-2)*7*DAY,closedAt:closed?now-daysAgo*DAY:null,notes:"",order:i,
       createdAt:now-(i+1)*2*DAY,updatedAt:now-(i%8)*3600e3,deletedAt:null};});
-  const taskTitles=["Send proposal","Follow up on demo","Schedule kickoff call","Confirm pricing","Check in after trial","Prepare contract","Reply to RFP","Book discovery call"];
-  state.tasks=Array.from({length:12},(_,i)=>({id:"t"+i,title:taskTitles[i%taskTitles.length]+" — "+cos[i%cos.length][0],
-    due:now+((i%7)-3)*DAY,priority:PRIORITIES[i%3],owner:reps[i%reps.length],status:i%5===0?"done":"open",
-    relatedType:"deal",relatedId:"d"+(i%90),createdAt:now-i*DAY,updatedAt:now,deletedAt:null}));
+  state.tasks=[
+    {id:"t0",title:"Send proposal — Acme Logistics",due:now-2*DAY,priority:"high",owner:reps[0],status:"open",relatedType:"deal",relatedId:"d0",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t1",title:"Follow up on demo — Nimbus Retail",due:now-1*DAY,priority:"high",owner:reps[1],status:"open",relatedType:"deal",relatedId:"d1",createdAt:now-4*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t2",title:"Schedule kickoff call — Vertex Health",due:now+1*DAY,priority:"medium",owner:reps[0],status:"open",relatedType:"deal",relatedId:"d2",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t3",title:"Confirm pricing — Orbit Media",due:now+2*DAY,priority:"medium",owner:reps[2],status:"open",relatedType:"deal",relatedId:"d3",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t4",title:"Check in after trial — Stride Fitness",due:now+3*DAY,priority:"low",owner:reps[1],status:"open",relatedType:"contact",relatedId:"c4",createdAt:now-5*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t5",title:"Prepare contract — Quill Software",due:now+1*DAY,priority:"high",owner:reps[0],status:"open",relatedType:"deal",relatedId:"d5",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t6",title:"Reply to RFP — Harbor Financial",due:now-3*DAY,priority:"high",owner:reps[3],status:"open",relatedType:"deal",relatedId:"d6",createdAt:now-5*DAY,updatedAt:now,createdBy:reps[3],deletedAt:null},
+    {id:"t7",title:"Book discovery call — Pine Manufacturing",due:now+5*DAY,priority:"low",owner:reps[2],status:"open",relatedType:"contact",relatedId:"c7",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t8",title:"Send proposal — Atlas Consulting",due:now,priority:"high",owner:reps[1],status:"open",relatedType:"deal",relatedId:"d8",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t9",title:"Call to review scope — Beacon Analytics",due:now+2*DAY,priority:"medium",owner:reps[0],status:"open",relatedType:"deal",relatedId:"d9",createdAt:now-4*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t10",title:"Send onboarding docs — Cedar Education",due:now+4*DAY,priority:"medium",owner:reps[2],status:"open",relatedType:"contact",relatedId:"c10",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t11",title:"Renewal check-in — Delta Energy",due:now+7*DAY,priority:"low",owner:reps[3],status:"open",relatedType:"deal",relatedId:"d11",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[3],deletedAt:null},
+    {id:"t12",title:"Share case study — Eagle Properties",due:now+3*DAY,priority:"low",owner:reps[1],status:"open",relatedType:"contact",relatedId:"c12",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t13",title:"Update deal stage — Foresight Capital",due:now-1*DAY,priority:"medium",owner:reps[0],status:"open",relatedType:"deal",relatedId:"d13",createdAt:now-6*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t14",title:"Prepare demo environment — Granite Construction",due:now+1*DAY,priority:"high",owner:reps[2],status:"open",relatedType:"deal",relatedId:"d14",createdAt:now-4*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t15",title:"Log call notes — Horizon Biotech",due:now,priority:"low",owner:reps[1],status:"open",relatedType:"contact",relatedId:"c15",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t16",title:"Coordinate with legal on NDA — Impact Ventures",due:now+6*DAY,priority:"medium",owner:reps[3],status:"open",relatedType:"company",relatedId:"co17",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[3],deletedAt:null},
+    {id:"t17",title:"Send meeting recap — Jade Networks",due:now-2*DAY,priority:"medium",owner:reps[0],status:"open",relatedType:"contact",relatedId:"c17",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t18",title:"Qualify inbound lead — Kite Advertising",due:now+2*DAY,priority:"high",owner:reps[2],status:"open",relatedType:"contact",relatedId:"c18",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t19",title:"Finalize SLA agreement — Lumen Healthcare",due:now+8*DAY,priority:"medium",owner:reps[1],status:"open",relatedType:"deal",relatedId:"d19",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t20",title:"Upsell conversation — Mesa Retail",due:now+5*DAY,priority:"low",owner:reps[3],status:"open",relatedType:"deal",relatedId:"d20",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[3],deletedAt:null},
+    {id:"t21",title:"Collect references — Noble Insurance",due:now+10*DAY,priority:"low",owner:reps[0],status:"open",relatedType:"contact",relatedId:"c21",createdAt:now-4*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t22",title:"Send proposal — Olympus Hotels",due:now-4*DAY,priority:"high",owner:reps[2],status:"done",relatedType:"deal",relatedId:"d22",createdAt:now-8*DAY,updatedAt:now-4*DAY,createdBy:reps[2],deletedAt:null},
+    {id:"t23",title:"Discovery call — Pacific Seafood",due:now-6*DAY,priority:"medium",owner:reps[1],status:"done",relatedType:"deal",relatedId:"d23",createdAt:now-9*DAY,updatedAt:now-6*DAY,createdBy:reps[1],deletedAt:null},
+    {id:"t24",title:"Send contract — Quantum Computing",due:now-3*DAY,priority:"high",owner:reps[0],status:"done",relatedType:"deal",relatedId:"d24",createdAt:now-5*DAY,updatedAt:now-3*DAY,createdBy:reps[0],deletedAt:null},
+    {id:"t25",title:"Intro call completed — Radius Marketing",due:now-5*DAY,priority:"low",owner:reps[3],status:"done",relatedType:"contact",relatedId:"c25",createdAt:now-7*DAY,updatedAt:now-5*DAY,createdBy:reps[3],deletedAt:null},
+    {id:"t26",title:"Proposal review — Summit Staffing",due:now-2*DAY,priority:"medium",owner:reps[2],status:"done",relatedType:"deal",relatedId:"d26",createdAt:now-6*DAY,updatedAt:now-2*DAY,createdBy:reps[2],deletedAt:null},
+    {id:"t27",title:"Kickoff meeting — Terra Agriculture",due:now-7*DAY,priority:"high",owner:reps[1],status:"done",relatedType:"deal",relatedId:"d27",createdAt:now-10*DAY,updatedAt:now-7*DAY,createdBy:reps[1],deletedAt:null},
+    {id:"t28",title:"Champion check-in — Union Aerospace",due:now+14*DAY,priority:"medium",owner:reps[0],status:"open",relatedType:"contact",relatedId:"c28",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t29",title:"Technical review call — Valor Defense",due:now+3*DAY,priority:"high",owner:reps[3],status:"open",relatedType:"deal",relatedId:"d29",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[3],deletedAt:null},
+    {id:"t30",title:"Confirm billing details — Westgate Legal",due:now+2*DAY,priority:"medium",owner:reps[2],status:"open",relatedType:"deal",relatedId:"d30",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t31",title:"Share ROI calculator — Xenon Pharma",due:now+4*DAY,priority:"low",owner:reps[1],status:"open",relatedType:"contact",relatedId:"c31",createdAt:now-2*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+    {id:"t32",title:"Executive sponsor intro — Yellowstone Media",due:now+9*DAY,priority:"medium",owner:reps[0],status:"open",relatedType:"company",relatedId:"co33",createdAt:now-1*DAY,updatedAt:now,createdBy:reps[0],deletedAt:null},
+    {id:"t33",title:"Pilot debrief — Zephyr Renewables",due:now+1*DAY,priority:"high",owner:reps[2],status:"open",relatedType:"deal",relatedId:"d33",createdAt:now-4*DAY,updatedAt:now,createdBy:reps[2],deletedAt:null},
+    {id:"t34",title:"Send security questionnaire — Apex Systems",due:now+6*DAY,priority:"medium",owner:reps[3],status:"open",relatedType:"deal",relatedId:"d34",createdAt:now-3*DAY,updatedAt:now,createdBy:reps[3],deletedAt:null},
+    {id:"t35",title:"Budget approval follow-up — Bluewave Fintech",due:now-1*DAY,priority:"high",owner:reps[1],status:"open",relatedType:"deal",relatedId:"d35",createdAt:now-5*DAY,updatedAt:now,createdBy:reps[1],deletedAt:null},
+  ];
   state.activities=[
     {id:"a0",type:"stage",text:"Deal 'Vertex Health — Enterprise upgrade' moved Qualified → Proposal Sent",actor:"Ricky Schweky",relatedType:"deal",relatedId:"d3",createdAt:now-2*3600e3,deletedAt:null},
     {id:"a1",type:"contact",text:"Added contact Sarah Chen",actor:"Joe Harari",relatedType:"contact",relatedId:"c0",createdAt:now-5*3600e3,deletedAt:null},
@@ -3947,16 +4131,31 @@ function seedDemo(){
     {id:"a4",type:"deal",text:"Created deal 'Harbor Financial — New logo' ($32,000)",actor:"Nathan Mosseri",relatedType:"deal",relatedId:"d6",createdAt:now-3*DAY,deletedAt:null},
   ];
   state.tickets=[
-    {id:"tk0",subject:"Login page not loading after update",type:"Bug",priority:"high",status:"open",description:"Users report the login page shows a blank screen after last week's platform update. Affecting ~30% of accounts.",contactId:"c0",companyId:"co0",dealId:"d0",owner:reps[0],createdAt:now-1*DAY,updatedAt:now-1*DAY,deletedAt:null},
-    {id:"tk1",subject:"Request to add bulk export to CSV",type:"Feature Request",priority:"medium",status:"in-progress",description:"Client needs ability to export all records to CSV monthly for their finance team.",contactId:"c2",companyId:"co1",dealId:null,owner:reps[1],createdAt:now-3*DAY,updatedAt:now-6*3600e3,deletedAt:null},
-    {id:"tk2",subject:"Invoice #1042 charged twice",type:"Billing",priority:"urgent",status:"open",description:"Double charge on Feb invoice. Client requesting refund of $240.",contactId:"c5",companyId:"co2",dealId:"d2",owner:reps[0],createdAt:now-4*3600e3,updatedAt:now-4*3600e3,deletedAt:null},
-    {id:"tk3",subject:"How do I set up SSO integration?",type:"Question",priority:"low",status:"resolved",description:"Client asking for step-by-step guide on setting up SAML SSO with their IdP.",contactId:"c10",companyId:"co3",dealId:null,owner:reps[2],createdAt:now-5*DAY,updatedAt:now-2*DAY,deletedAt:null},
-    {id:"tk4",subject:"Data not syncing with Salesforce",type:"Bug",priority:"high",status:"in-progress",description:"Bi-directional sync stopped working after Salesforce API update. Deal records not updating.",contactId:"c15",companyId:"co4",dealId:"d4",owner:reps[1],createdAt:now-2*DAY,updatedAt:now-12*3600e3,deletedAt:null},
-    {id:"tk5",subject:"Request custom dashboard widgets",type:"Feature Request",priority:"medium",status:"open",description:"Enterprise client requesting configurable KPI widgets on their dashboard homepage.",contactId:"c20",companyId:"co5",dealId:"d5",owner:reps[3],createdAt:now-6*DAY,updatedAt:now-6*DAY,deletedAt:null},
-    {id:"tk6",subject:"Permissions issue for new team member",type:"General",priority:"low",status:"resolved",description:"New hire cannot access reporting module despite Admin role assigned.",contactId:"c25",companyId:"co6",dealId:null,owner:reps[2],createdAt:now-8*DAY,updatedAt:now-3*DAY,deletedAt:null},
-    {id:"tk7",subject:"API rate limit errors in production",type:"Bug",priority:"urgent",status:"open",description:"Intermittent 429 errors hitting API at peak hours. Need rate limit raised or throttling fix.",contactId:"c30",companyId:"co7",dealId:"d7",owner:reps[0],createdAt:now-10*3600e3,updatedAt:now-10*3600e3,deletedAt:null},
-    {id:"tk8",subject:"Renewal pricing clarification",type:"Billing",priority:"medium",status:"closed",description:"Client wants breakdown of renewal quote and discount eligibility for 3-year commitment.",contactId:"c35",companyId:"co8",dealId:"d8",owner:reps[3],createdAt:now-10*DAY,updatedAt:now-4*DAY,deletedAt:null},
-    {id:"tk9",subject:"Mobile app crashes on iOS 17",type:"Bug",priority:"high",status:"open",description:"Multiple users reporting app crashes immediately on launch on devices running iOS 17.2+.",contactId:"c40",companyId:"co9",dealId:null,owner:reps[1],createdAt:now-18*3600e3,updatedAt:now-18*3600e3,deletedAt:null},
+    {id:"tk0",subject:"Login page not loading after update",type:"Bug",priority:"high",status:"open",description:"Users report the login page shows a blank screen after last week's platform update. Affecting ~30% of accounts. Chrome and Firefox both affected; Safari appears fine.",contactId:"c0",companyId:"co0",dealId:"d0",owner:reps[0],createdAt:now-1*DAY,updatedAt:now-1*DAY,deletedAt:null},
+    {id:"tk1",subject:"Request to add bulk export to CSV",type:"Feature Request",priority:"medium",status:"in-progress",description:"Client needs ability to export all records to CSV monthly for their finance team. Currently exporting one record at a time which is not scalable for their 5,000+ contact database.",contactId:"c2",companyId:"co1",dealId:null,owner:reps[1],createdAt:now-3*DAY,updatedAt:now-6*3600e3,deletedAt:null},
+    {id:"tk2",subject:"Invoice #1042 charged twice",type:"Billing",priority:"urgent",status:"open",description:"Double charge on Feb invoice. Client requesting refund of $240. Credit card statement shows two identical charges on the 1st and 2nd. Need to investigate payment processor logs.",contactId:"c5",companyId:"co2",dealId:"d2",owner:reps[0],createdAt:now-4*3600e3,updatedAt:now-4*3600e3,deletedAt:null},
+    {id:"tk3",subject:"How do I set up SSO integration?",type:"Question",priority:"low",status:"resolved",description:"Client asking for step-by-step guide on setting up SAML SSO with their IdP (Okta). Sent documentation and walkthrough video. Client confirmed setup complete.",contactId:"c10",companyId:"co3",dealId:null,owner:reps[2],createdAt:now-5*DAY,updatedAt:now-2*DAY,deletedAt:null},
+    {id:"tk4",subject:"Data not syncing with Salesforce",type:"Bug",priority:"high",status:"in-progress",description:"Bi-directional sync stopped working after Salesforce API update. Deal records not updating in either direction. Engineering investigating the OAuth token refresh flow.",contactId:"c15",companyId:"co4",dealId:"d4",owner:reps[1],createdAt:now-2*DAY,updatedAt:now-12*3600e3,deletedAt:null},
+    {id:"tk5",subject:"Request custom dashboard widgets",type:"Feature Request",priority:"medium",status:"open",description:"Enterprise client requesting configurable KPI widgets on their dashboard homepage. Wants to track weekly revenue, open deals by stage, and task completion rate in a single view.",contactId:"c20",companyId:"co5",dealId:"d5",owner:reps[3],createdAt:now-6*DAY,updatedAt:now-6*DAY,deletedAt:null},
+    {id:"tk6",subject:"Permissions issue for new team member",type:"General",priority:"low",status:"resolved",description:"New hire cannot access reporting module despite Admin role assigned. Root cause: role cache not invalidated on first login. Fixed by logging out and back in. Documented workaround.",contactId:"c25",companyId:"co6",dealId:null,owner:reps[2],createdAt:now-8*DAY,updatedAt:now-3*DAY,deletedAt:null},
+    {id:"tk7",subject:"API rate limit errors in production",type:"Bug",priority:"urgent",status:"open",description:"Intermittent 429 errors hitting API at peak hours (9–11am EST). Client's integration is sending ~800 req/min; current limit is 600. Need rate limit raised or throttling solution implemented.",contactId:"c30",companyId:"co7",dealId:"d7",owner:reps[0],createdAt:now-10*3600e3,updatedAt:now-10*3600e3,deletedAt:null},
+    {id:"tk8",subject:"Renewal pricing clarification",type:"Billing",priority:"medium",status:"closed",description:"Client wants breakdown of renewal quote and discount eligibility for 3-year commitment. Sent updated quote with 15% multi-year discount applied. Client accepted and signed.",contactId:"c35",companyId:"co8",dealId:"d8",owner:reps[3],createdAt:now-10*DAY,updatedAt:now-4*DAY,deletedAt:null},
+    {id:"tk9",subject:"Mobile app crashes on iOS 17",type:"Bug",priority:"high",status:"open",description:"Multiple users reporting app crashes immediately on launch on devices running iOS 17.2+. Not reproducible on iOS 16. Likely related to Swift concurrency changes in the latest update.",contactId:"c40",companyId:"co9",dealId:null,owner:reps[1],createdAt:now-18*3600e3,updatedAt:now-18*3600e3,deletedAt:null},
+    {id:"tk10",subject:"Need white-label branding option",type:"Feature Request",priority:"medium",status:"open",description:"Agency client wants to resell the platform under their own brand. Requesting ability to replace logo, colors, and domain name. High priority for their Q3 contract renewal.",contactId:"c45",companyId:"co10",dealId:"d10",owner:reps[2],createdAt:now-4*DAY,updatedAt:now-4*DAY,deletedAt:null},
+    {id:"tk11",subject:"Email notifications going to spam",type:"Bug",priority:"medium",status:"in-progress",description:"Automated task reminder emails landing in spam for three enterprise clients. SPF/DKIM records appear correct. Investigating DMARC policy alignment and email reputation score.",contactId:"c50",companyId:"co11",dealId:null,owner:reps[0],createdAt:now-3*DAY,updatedAt:now-1*DAY,deletedAt:null},
+    {id:"tk12",subject:"Overage charge on March invoice",type:"Billing",priority:"high",status:"open",description:"Client disputes $380 overage charge on March invoice, says they were under their seat limit all month. Need to pull usage logs and reconcile against billing records.",contactId:"c55",companyId:"co12",dealId:"d12",owner:reps[3],createdAt:now-6*3600e3,updatedAt:now-6*3600e3,deletedAt:null},
+    {id:"tk13",subject:"Can we get a dedicated CSM?",type:"Question",priority:"low",status:"resolved",description:"Client asking about dedicated customer success manager for their Enterprise tier. Introduced them to Nathan Mosseri as their CSM. Onboarding call scheduled for next Tuesday.",contactId:"c60",companyId:"co13",dealId:"d13",owner:reps[3],createdAt:now-7*DAY,updatedAt:now-1*DAY,deletedAt:null},
+    {id:"tk14",subject:"Search filters returning wrong results",type:"Bug",priority:"high",status:"in-progress",description:"Contact search filter by 'industry' returns results from other industries when combined with a date filter. Reproducible with at least 3 filter combinations. Backend query logic under review.",contactId:"c65",companyId:"co14",dealId:null,owner:reps[1],createdAt:now-2*DAY,updatedAt:now-8*3600e3,deletedAt:null},
+    {id:"tk15",subject:"Request Zapier integration",type:"Feature Request",priority:"medium",status:"open",description:"Multiple clients requesting a native Zapier integration to connect CRM data to their existing automation workflows. Would replace current manual CSV exports.",contactId:"c70",companyId:"co15",dealId:"d15",owner:reps[2],createdAt:now-9*DAY,updatedAt:now-9*DAY,deletedAt:null},
+    {id:"tk16",subject:"Two-factor auth not sending SMS",type:"Bug",priority:"urgent",status:"open",description:"Several users unable to log in because 2FA SMS codes are not arriving. Affects Verizon and T-Mobile numbers. AT&T users unaffected. SMS provider outage suspected.",contactId:"c75",companyId:"co16",dealId:null,owner:reps[0],createdAt:now-5*3600e3,updatedAt:now-5*3600e3,deletedAt:null},
+    {id:"tk17",subject:"Data export format change request",type:"Feature Request",priority:"low",status:"closed",description:"Client requested JSON export option in addition to CSV. Feature was added in v2.4 release. Client confirmed it meets their needs and closed the ticket.",contactId:"c80",companyId:"co17",dealId:"d17",owner:reps[3],createdAt:now-14*DAY,updatedAt:now-5*DAY,deletedAt:null},
+    {id:"tk18",subject:"Incorrect deal value in pipeline report",type:"Bug",priority:"medium",status:"open",description:"Pipeline report shows $145k for Q2, but manual sum of open deals totals $162k. Discrepancy appears to be deals marked 'Proposal Sent' not included in the report aggregation.",contactId:"c85",companyId:"co18",dealId:"d18",owner:reps[1],createdAt:now-2*DAY,updatedAt:now-2*DAY,deletedAt:null},
+    {id:"tk19",subject:"How to add custom fields to contact records?",type:"Question",priority:"low",status:"resolved",description:"New admin user asking how to configure custom fields. Walked through the Settings → Custom Fields flow. User added 4 fields successfully. Closed after confirmation.",contactId:"c90",companyId:"co19",dealId:null,owner:reps[2],createdAt:now-6*DAY,updatedAt:now-3*DAY,deletedAt:null},
+    {id:"tk20",subject:"Account data missing after migration",type:"Bug",priority:"urgent",status:"in-progress",description:"Post-migration audit shows 23 company records missing from the new environment. Import logs show no errors. Comparing source and destination databases to identify discrepancy.",contactId:"c95",companyId:"co20",dealId:"d20",owner:reps[0],createdAt:now-1*DAY,updatedAt:now-3*3600e3,deletedAt:null},
+    {id:"tk21",subject:"Upgrade to annual plan mid-cycle",type:"Billing",priority:"medium",status:"open",description:"Client on monthly plan wants to switch to annual for cost savings. Needs prorated credit for remaining monthly days applied to the annual invoice. Awaiting finance approval.",contactId:"c100",companyId:"co21",dealId:"d21",owner:reps[3],createdAt:now-3*DAY,updatedAt:now-3*DAY,deletedAt:null},
+    {id:"tk22",subject:"Bulk contact import stalling at 80%",type:"Bug",priority:"high",status:"open",description:"Import job for 12,000 contacts hangs at 80% complete and times out after 5 minutes. Smaller batches (under 2,000) work fine. Server timeout threshold may need adjustment.",contactId:"c105",companyId:"co22",dealId:null,owner:reps[1],createdAt:now-16*3600e3,updatedAt:now-16*3600e3,deletedAt:null},
+    {id:"tk23",subject:"Request advanced analytics add-on pricing",type:"Question",priority:"low",status:"resolved",description:"Client asked for pricing on the Advanced Analytics add-on module. Sent detailed pricing sheet and feature comparison. Client is evaluating internally — follow-up scheduled in 2 weeks.",contactId:"c110",companyId:"co23",dealId:"d23",owner:reps[2],createdAt:now-11*DAY,updatedAt:now-2*DAY,deletedAt:null},
+    {id:"tk24",subject:"Calendar integration not pulling events",type:"Integration",priority:"medium",status:"in-progress",description:"Google Calendar integration authorized but no events syncing to activity timeline. OAuth scopes appear correct. Investigating whether calendar.readonly scope is sufficient or if calendar.events is needed.",contactId:"c115",companyId:"co24",dealId:"d24",owner:reps[0],createdAt:now-4*DAY,updatedAt:now-1*DAY,deletedAt:null},
   ];
   state.products=[
     {id:"pr0",name:"MerchantsBI Integration",description:"Seamlessly connect your merchant data to MerchantsBI for real-time analytics, reporting, and business intelligence dashboards.",category:"Integration",status:"active",price:"Contact for pricing",createdAt:now-30*DAY,updatedAt:now-30*DAY,deletedAt:null},
@@ -4035,6 +4234,148 @@ Either way, feel free to reply and let me know — even a quick "not now" is hel
 
 Best,
 {{your_name}}`,createdAt:now-3*DAY,updatedAt:now-3*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl5",name:"Cold Outreach — First Touch",category:"Cold Outreach",body:`Hi {{first_name}},
+
+I came across {{company}} and was impressed by {{specific_observation}} — it looks like you're doing great work in the {{industry}} space.
+
+I reach out because we work with teams like yours to {{value_proposition}}. Most of our clients in {{industry}} see results within the first 60 days.
+
+Would it be worth a 15-minute call to see if there's a fit? I'm happy to work around your schedule.
+
+{{your_name}}`,createdAt:now-20*DAY,updatedAt:now-20*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl6",name:"Cold Outreach — Second Touch",category:"Cold Outreach",body:`Hi {{first_name}},
+
+I wanted to follow up on my note from last week in case it got buried.
+
+Quick context: I work with {{industry}} teams helping them {{value_proposition}}. Given {{company}}'s growth, I thought the timing might be right.
+
+If this isn't a priority right now, no problem at all — just let me know and I'll stop reaching out. But if you'd like to chat, I have a few open slots this week.
+
+{{your_name}}`,createdAt:now-18*DAY,updatedAt:now-18*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl7",name:"Contract Sent",category:"Contract",body:`Hi {{first_name}},
+
+Great news — I've sent over the contract via [DocuSign/PandaDoc] to {{signer_email}}. The link is also valid for 7 days.
+
+A few highlights from the agreement:
+• Start date: {{start_date}}
+• Term: {{contract_length}}
+• Total investment: {{contract_value}}
+
+Please review and sign at your earliest convenience. I'm available if you have any questions before signing — just reply here or give me a call.
+
+Looking forward to getting started!
+
+{{your_name}}`,createdAt:now-16*DAY,updatedAt:now-16*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl8",name:"Onboarding Welcome",category:"Onboarding",body:`Hi {{first_name}},
+
+Welcome to MerchantsBI! We're thrilled to have {{company}} on board.
+
+Here's what to expect over the next few weeks:
+
+Week 1 — Setup & Access
+• Your account is being configured now. You'll receive login credentials within 24 hours.
+• Your dedicated onboarding specialist is {{csm_name}} — she'll be your main point of contact.
+
+Week 2 — Training
+• Live walkthrough session scheduled for {{training_date}} at {{training_time}}.
+• Self-paced tutorials available in the Help Center: [LINK]
+
+Week 3 — Go Live
+• Final QA and data validation with your team.
+• Go-live date: {{go_live_date}}
+
+Questions? Reply here or reach out to {{csm_email}} anytime.
+
+Excited to work together,
+{{your_name}}`,createdAt:now-22*DAY,updatedAt:now-22*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl9",name:"Quarterly Check-In",category:"Check-In",body:`Hi {{first_name}},
+
+Hard to believe it's been {{time_period}} since we got started — time flies!
+
+I wanted to touch base and make sure things are going well on your end. A few things I'd love to cover on a quick call:
+
+1. How has the platform been performing against your original goals?
+2. Are there any features or workflows you're not fully utilizing yet?
+3. What's on your roadmap for next quarter that we can help support?
+
+Would you have 20 minutes in the next week or two? Here's my calendar: [LINK]
+
+Always here if you need anything in the meantime.
+
+Best,
+{{your_name}}`,createdAt:now-25*DAY,updatedAt:now-25*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl10",name:"Churn Risk — Save Attempt",category:"Retention",body:`Hi {{first_name}},
+
+I noticed some changes in {{company}}'s usage recently and wanted to reach out personally to make sure everything's going well.
+
+If there's anything we can do better — whether it's a feature that isn't meeting expectations, a support issue that hasn't been resolved, or a pricing concern — I'd love the chance to talk through it.
+
+We genuinely value your partnership and want to make sure you're getting full value from MerchantsBI.
+
+Could we schedule 20 minutes this week? I'm happy to work around your schedule.
+
+{{your_name}}`,createdAt:now-12*DAY,updatedAt:now-12*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl11",name:"Renewal Reminder — 60 Days Out",category:"Renewal",body:`Hi {{first_name}},
+
+Your {{company}} subscription renews on {{renewal_date}} — just 60 days away. I wanted to get ahead of it to ensure a smooth renewal and explore if anything should change for the upcoming term.
+
+A few options worth discussing:
+• Locking in your current rate (prices increase {{price_increase_date}})
+• Upgrading to annual billing for a {{annual_discount}}% discount
+• Adding seats or modules your team has been asking about
+
+Would you have 30 minutes before {{renewal_date}} to align on next steps? Happy to also send over a renewal quote in advance.
+
+Best,
+{{your_name}}`,createdAt:now-8*DAY,updatedAt:now-8*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl12",name:"Trial Expiration — Upgrade Nudge",category:"Trial",body:`Hi {{first_name}},
+
+Your MerchantsBI trial wraps up in {{days_remaining}} days — I hope you've had a chance to explore the platform!
+
+Based on your activity, it looks like you've been making great use of {{most_used_feature}}. That's one of the features our customers mention most often as a game-changer.
+
+To keep the momentum going, here are your upgrade options:
+• Starter: {{starter_price}}/mo — up to 3 users
+• Professional: {{pro_price}}/mo — up to 10 users + advanced analytics
+• Enterprise: Custom pricing — unlimited users + dedicated support
+
+I'd love to help you pick the right plan. Available for a quick call this week?
+
+{{your_name}}`,createdAt:now-11*DAY,updatedAt:now-11*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl13",name:"Referral Request",category:"Referral",body:`Hi {{first_name}},
+
+I'm really glad to hear things are going well at {{company}} — it's been great working with your team.
+
+I have a favor to ask: do you know anyone else in your network who might benefit from MerchantsBI? Even a warm introduction goes a long way.
+
+We have a referral program that rewards you with {{referral_reward}} for every customer you refer who signs up. All it takes is a quick email intro — I'll take it from there.
+
+No pressure at all — I just figured it was worth asking since you've had such a positive experience.
+
+Thanks in advance,
+{{your_name}}`,createdAt:now-17*DAY,updatedAt:now-17*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl14",name:"Event / Conference Follow-Up",category:"Event Follow-Up",body:`Hi {{first_name}},
+
+It was great meeting you at {{event_name}} last week! I really enjoyed our conversation about {{discussion_topic}}.
+
+As I mentioned, MerchantsBI helps {{value_statement}}. Given what you shared about {{company}}'s goals, I think there's a real opportunity to explore a fit.
+
+Would you be open to a 20-minute call in the next week or two? I'd love to dig into your current setup and show you a quick demo.
+
+Here's my calendar link: [LINK]
+
+Hope to chat soon,
+{{your_name}}`,createdAt:now-9*DAY,updatedAt:now-9*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
+    {id:"tmpl15",name:"Lost Deal — Stay in Touch",category:"Follow-Up",body:`Hi {{first_name}},
+
+Thanks again for the time you invested in evaluating MerchantsBI. Even though the timing wasn't right this time, I really enjoyed learning about {{company}}'s goals.
+
+I'd love to stay on your radar — and likewise keep {{company}} on mine. Things change quickly, and I'd rather reconnect when the timing is better than lose touch entirely.
+
+I'll check back in around {{followup_date}}. In the meantime, don't hesitate to reach out if anything shifts.
+
+Wishing you and the team all the best,
+{{your_name}}`,createdAt:now-6*DAY,updatedAt:now-6*DAY,createdBy:"demo@merchantsbi.com",deletedAt:null},
   ];
   state.supportCategories=[
     {id:"sc0",name:"Bug",description:"Software defects, errors, or unexpected behavior",color:"#dc2626",createdAt:now-60*DAY,updatedAt:now-60*DAY,deletedAt:null},
@@ -4051,6 +4392,8 @@ Best,
     {id:"sl3",priority:"low",firstResponseHours:24,resolutionHours:168,createdAt:now-60*DAY,updatedAt:now-60*DAY,deletedAt:null},
   ];
   localSeq=100;
+  // tag all in-memory records so clearSeedData can identify them
+  ["contacts","companies","deals","tasks","activities","tickets","products","templates","supportCategories","slaRules"].forEach(c=>{if(state[c])state[c].forEach(r=>r.seeded=true);});
 }
 
 /* ---- live seed — writes 75 companies, 500 contacts, 90 deals to Firestore ---- */
@@ -4059,7 +4402,10 @@ async function seedLive(btn){
   const now=Date.now(),DAY=864e5;
   const reps=state.members.length?state.members.map(m=>m.name):["Ricky Schweky","Joe Harari","Gabe Lesser","Nathan Mosseri"];
   const actor=state.user?.email||"seed@system";
-  const audit=(ca)=>({createdAt:ca,updatedAt:now,createdBy:actor,deletedAt:null});
+  const audit=(ca)=>({createdAt:ca,updatedAt:now,createdBy:actor,deletedAt:null,seeded:true});
+  // Seed-run attribution stamped on every generated record for traceability.
+  const seedRunId=`${now}-ui`;
+  const seedMeta={seedSource:"ui/reseed",seedRunId,seededAt:now,seededBy:actor};
   const CO_DATA=[
     ["Acme Logistics","Logistics","51-200","Chicago, IL"],["Nimbus Retail","Retail","201-500","Austin, TX"],
     ["Vertex Health","Healthcare","500+","Boston, MA"],["Orbit Media","Marketing","11-50","Denver, CO"],
@@ -4118,7 +4464,7 @@ async function seedLive(btn){
   coRefs.forEach((ref,i)=>{
     const [name,industry,size,location]=CO_DATA[i];
     ops.push([ref,{name,industry,size,location,website:"https://"+name.toLowerCase().replace(/[^a-z0-9]+/g,"")+".com",
-      owner:reps[i%reps.length],...audit(now-(i+1)*2*DAY)}]);
+      owner:reps[i%reps.length],...audit(now-(i+1)*2*DAY),...seedMeta}]);
   });
   // Contacts — 25 first × 20 last = 500 unique combos
   cRefs.forEach((ref,i)=>{
@@ -4131,7 +4477,7 @@ async function seedLive(btn){
       status:STATUSES[i%STATUSES.length],source:SOURCES[i%SOURCES.length],
       owner:reps[i%reps.length],tags:i%5===0?["priority"]:i%7===0?["newsletter"]:[],
       lastContacted:i%8===0?null:now-(i%21)*DAY,notes:"",
-      ...audit(now-(i+1)*DAY)}]);
+      ...audit(now-(i+1)*DAY),...seedMeta}]);
   });
   // Deals — 55 open (stages 0–4), 12 Won, 8 Onboarding, 7 Live, 8 Lost
   dRefs.forEach((ref,i)=>{
@@ -4146,7 +4492,7 @@ async function seedLive(btn){
       priority:PRIORITIES[i%3],source:SOURCES[i%SOURCES.length],owner:reps[i%reps.length],
       expectedClose:closed?now-daysAgo*DAY:now+(i%12-2)*7*DAY,
       closedAt:closed?now-daysAgo*DAY:null,notes:"",order:i,
-      ...audit(now-(i+1)*2*DAY)}]);
+      ...audit(now-(i+1)*2*DAY),...seedMeta}]);
   });
 
   // Write in chunks of 499 (Firestore batch limit is 500)
@@ -4164,6 +4510,35 @@ async function seedLive(btn){
     return;
   }
   if(btn){btn.disabled=false;btn.innerHTML=`${I.spark}Re-seed data`;}
+}
+
+/* ---- clear seed data — soft-deletes all seeded records ---- */
+async function clearSeedData(btn){
+  if(!confirm("This will remove all seeded contacts, companies, deals, tasks, activities, and tickets. Real data you created will not be affected.\n\nContinue?"))return;
+  const SEED_COLLS=["contacts","companies","deals","tasks","activities","tickets"];
+  if(!fbReady){
+    SEED_COLLS.forEach(c=>{state[c]=(state[c]||[]).filter(r=>!r.seeded);});
+    toast("Seed data cleared","ok");render();return;
+  }
+  if(btn){btn.disabled=true;btn.innerHTML=`<span class="spin"></span> Clearing…`;}
+  const now=Date.now();
+  const ops=[];
+  SEED_COLLS.forEach(coll=>{
+    (state[coll]||[]).filter(r=>r.seeded&&!r.deletedAt).forEach(r=>{ops.push(doc(db,coll,r.id));});
+  });
+  if(!ops.length){toast("No seeded data found","ok");if(btn){btn.disabled=false;btn.innerHTML=`${I.trash}Drop seed data`;}return;}
+  try{
+    for(let i=0;i<ops.length;i+=499){
+      const b=writeBatch(db);
+      ops.slice(i,i+499).forEach(r=>b.update(r,{deletedAt:now,updatedAt:now}));
+      await b.commit();
+      if(btn)btn.innerHTML=`<span class="spin"></span> ${Math.min(i+499,ops.length)}/${ops.length}…`;
+    }
+    toast(`Cleared ${ops.length} seeded records`,"ok");
+  }catch(e){
+    toast("Clear failed: "+e.message,"err");
+  }
+  if(btn){btn.disabled=false;btn.innerHTML=`${I.trash}Drop seed data`;}
 }
 
 /* ====================================================================

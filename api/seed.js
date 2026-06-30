@@ -255,7 +255,7 @@ export default async function handler(req, res) {
   const secret = process.env.SEED_SECRET;
   if (!secret) return res.status(503).json({ error: "SEED_SECRET env var not configured" });
 
-  const { secret: provided, force = false } = req.body || {};
+  const { secret: provided, force = false, caller = "api/seed" } = req.body || {};
   if (provided !== secret) return res.status(401).json({ error: "Invalid secret" });
 
   if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -282,12 +282,23 @@ export default async function handler(req, res) {
 
   const now = getNow();
 
+  // Seed-run attribution — stamped on every generated record for traceability.
+  // seedRunId ties all records from this invocation together; seedSource identifies
+  // the origin path (api/seed vs ui/reseed); caller is the triggering actor.
+  const seedRunId = `${now}-api`;
+  const seedMeta = {
+    seedSource: "api/seed",
+    seedRunId,
+    seededAt: now,
+    seededBy: caller,
+  };
+
   // Build companies
   const companyDocs = buildCompanies(now);
   const companyRefs = companyDocs.map(() => db.collection("companies").doc());
   companyDocs.forEach((doc, i) => { doc._id = companyRefs[i].id; });
   await batchWrite(db, companyRefs.map((ref, i) => {
-    const { _id, ...data } = companyDocs[i]; return { ref, data };
+    const { _id, ...data } = companyDocs[i]; return { ref, data: { ...data, ...seedMeta } };
   }));
 
   // Build contacts
@@ -295,7 +306,7 @@ export default async function handler(req, res) {
   const contactRefs = contactDocs.map(() => db.collection("contacts").doc());
   contactDocs.forEach((doc, i) => { doc._id = contactRefs[i].id; });
   await batchWrite(db, contactRefs.map((ref, i) => {
-    const { _id, ...data } = contactDocs[i]; return { ref, data };
+    const { _id, ...data } = contactDocs[i]; return { ref, data: { ...data, ...seedMeta } };
   }));
 
   // Build deals
@@ -303,7 +314,7 @@ export default async function handler(req, res) {
   const dealRefs = dealDocs.map(() => db.collection("deals").doc());
   dealDocs.forEach((doc, i) => { doc._id = dealRefs[i].id; });
   await batchWrite(db, dealRefs.map((ref, i) => {
-    const { _id, ...data } = dealDocs[i]; return { ref, data };
+    const { _id, ...data } = dealDocs[i]; return { ref, data: { ...data, ...seedMeta } };
   }));
 
   const won = dealDocs.filter(d => d.stage === "Won");
@@ -312,6 +323,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
+    seedRunId,
     companies: companyDocs.length,
     contacts: contactDocs.length,
     deals: {
