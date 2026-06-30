@@ -219,6 +219,11 @@
   .kcol-head .nm{font-size:12.5px;font-weight:600;}
   .kcol-head .ct{font-size:11px;color:var(--faint);}
   .kcol-head .tot{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted);}
+  .kcol-search{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0 7px;height:26px;}
+  .kcol-search input{border:none;background:none;font-size:11.5px;width:100%;outline:none;color:var(--ink);}
+  .kcol-search input::placeholder{color:var(--faint);}
+  .kcol-search svg{width:11px;height:11px;color:var(--faint);flex:none;}
+  .board.vert .kcol-search{display:none;}
   .dealcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 12px;cursor:grab;box-shadow:var(--shadow);transition:box-shadow .12s,transform .05s;display:flex;flex-direction:column;gap:7px;}
   .dealcard:active{cursor:grabbing;}
   .dealcard.dragging{opacity:.4;}
@@ -233,9 +238,13 @@
   .prio.low{background:var(--surface-2);color:var(--muted);}
   .od-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:7px;cursor:pointer;transition:background .15s;}
   .od-row:hover{background:var(--surface-2);}
+  /* horizontal kanban — fill viewport, scrollbar always visible */
+  .board:not(.vert){align-items:stretch;overflow-y:hidden;}
+  .board:not(.vert) .kcol{overflow-y:auto;}
   /* vertical kanban */
-  .board.vert{display:flex;flex-direction:column;overflow-x:hidden;padding-bottom:0;width:100%;}
-  .board.vert .kcol{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;min-height:auto;gap:9px;overflow-x:auto;min-width:0;}
+  .board-vert-wrap{overflow-x:auto;width:100%;padding-bottom:12px;scrollbar-width:thin;}
+  .board.vert{display:flex;flex-direction:column;overflow-x:visible;padding-bottom:0;width:max-content;min-width:100%;}
+  .board.vert .kcol{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;min-height:auto;gap:9px;overflow-x:visible;}
   .board.vert .kcol-head{flex:none;width:132px;min-width:132px;flex-direction:column;align-items:flex-start;gap:4px;padding:4px 10px 4px 4px;border-right:2px solid var(--line);align-self:stretch;}
   .board.vert .kcol-head .tot{margin-left:0;}
   .board.vert .dealcard{width:200px;flex:none;}
@@ -731,6 +740,7 @@ const state={ page:"dashboard", detail:null, user:null,
   _dSort:{col:"",dir:"asc"}, _dColF:{name:"",company:"",owner:"",createdBy:""}, _dView:"", _pipeView:"bars",
   _dSearch: localStorage.getItem("pulse-deals-search")||"",
   _bSearch: localStorage.getItem("pulse-deals-bsearch")||"",
+  _stageSearch:{},
   _dStageF: localStorage.getItem("pulse-deals-stage")||"",
   _dPrioF: localStorage.getItem("pulse-deals-prio")||"",
   _dCloseF: localStorage.getItem("pulse-deals-close")||"",
@@ -1969,7 +1979,7 @@ function renderDeals(c){
           <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
          <div class="card tablecard" id="dtable"></div>`
       :`<div class="toolbar"><div class="field-search">${I.search}<input id="bsearch" placeholder="Search deals, companies, owners…" value="${esc(state._bSearch||"")}"></div><select class="input" id="bclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
-          <div class="board${ori==="v"?" vert":""}" id="board"></div>`}`;
+          ${ori==="v"?`<div class="board-vert-wrap"><div class="board vert" id="board"></div></div>`:`<div class="board" id="board"></div>`}`}`;
   const setView=(v,o)=>{state._dView=v;if(o)state._pipeOri=o;try{localStorage.setItem("pulse-deals-view",v);if(o)localStorage.setItem("pulse-pipe-ori",o);}catch(_){}renderDeals(c);};
   c.querySelectorAll("[data-dealstf]").forEach(btn=>btn.onclick=()=>{
     state._dealsTf=btn.dataset.dealstf;
@@ -2097,19 +2107,35 @@ function renderDeals(c){
       return true;
     };
     const board=$("#board");
+    const matchSQ=(d,sq)=>{const co=companyById(d.companyId)?.name||"";return d.name.toLowerCase().includes(sq)||co.toLowerCase().includes(sq)||(d.owner||"").toLowerCase().includes(sq);};
+    const wireCards=cont=>{cont.querySelectorAll(".dealcard").forEach(card=>{card.draggable=true;card.ondragstart=e=>{e.dataTransfer.setData("text/plain",card.dataset.id);card.classList.add("dragging");};card.ondragend=()=>card.classList.remove("dragging");card.onclick=()=>dealForm(card.dataset.id);});};
     board.innerHTML=stageList().map(s=>{
-      const items=D.filter(d=>d.stage===s&&filterDeal(d)).sort((a,b)=>(a.order||0)-(b.order||0));
+      const sq=(state._stageSearch[s]||"").toLowerCase();
+      const items=D.filter(d=>d.stage===s&&filterDeal(d)&&(!sq||matchSQ(d,sq))).sort((a,b)=>(a.order||0)-(b.order||0));
       const tot=items.reduce((a,d)=>a+(+d.value||0),0);
       return `<div class="kcol" data-stage="${esc(s)}">
         <div class="kcol-head"><span class="dot" style="background:${stageColor(s)}"></span><span class="nm">${s}</span><span class="ct">${items.length}</span><span class="tot">${moneyK(tot)}</span></div>
-        ${items.length?items.map(d=>dealCard(d,bq)).join(""):(bq?`<div class="kcol-empty">No matches</div>`:"")}
+        <div class="kcol-search">${I.search}<input type="text" placeholder="Search…" value="${esc(state._stageSearch[s]||"")}" data-stage-si="${esc(s)}" autocomplete="off"></div>
+        <div class="kcol-cards">${items.length?items.map(d=>dealCard(d,bq)).join(""):(bq||sq?`<div class="kcol-empty">No matches</div>`:"")}</div>
         </div>`;
     }).join("");
-    board.querySelectorAll(".dealcard").forEach(card=>{
-      card.draggable=true;
-      card.ondragstart=e=>{e.dataTransfer.setData("text/plain",card.dataset.id);card.classList.add("dragging");};
-      card.ondragend=()=>card.classList.remove("dragging");
-      card.onclick=()=>dealForm(card.dataset.id);
+    wireCards(board);
+    board.querySelectorAll("[data-stage-si]").forEach(inp=>{
+      inp.onclick=e=>e.stopPropagation();
+      inp.oninput=()=>{
+        const s=inp.dataset.stageSi;
+        state._stageSearch[s]=inp.value;
+        const col=board.querySelector(`.kcol[data-stage="${CSS.escape(s)}"]`);
+        if(!col)return;
+        const sq=inp.value.toLowerCase();
+        const colItems=D.filter(d=>d.stage===s&&filterDeal(d)&&(!sq||matchSQ(d,sq))).sort((a,b)=>(a.order||0)-(b.order||0));
+        const colTot=colItems.reduce((a,d)=>a+(+d.value||0),0);
+        col.querySelector(".ct").textContent=colItems.length;
+        col.querySelector(".tot").textContent=moneyK(colTot);
+        const cardsEl=col.querySelector(".kcol-cards");
+        cardsEl.innerHTML=colItems.length?colItems.map(d=>dealCard(d,bq)).join(""):(bq||sq?`<div class="kcol-empty">No matches</div>`:"");
+        wireCards(cardsEl);
+      };
     });
     board.querySelectorAll(".kcol").forEach(col=>{
       col.ondragover=e=>{e.preventDefault();col.classList.add("dragover");};
@@ -2120,6 +2146,11 @@ function renderDeals(c){
           dbUpdate("deals",id,patch,true); logActivity("stage",`Deal "${d.name}" moved ${old} → ${ns}`,"deal",id); notifySlack(`:arrows_counterclockwise: *Deal stage changed*: "${d.name}" moved from *${old}* → *${ns}* (${money(d.value)})`); toast(`Moved to ${ns}`,"ok"); }
       };
     });
+    if(!board.classList.contains("vert")){
+      const sizeBoard=()=>{const b=$("#board");if(!b||b.classList.contains("vert"))return;const top=b.getBoundingClientRect().top;b.style.height=(window.innerHeight-top-8)+"px";};
+      sizeBoard();
+      if(!window._kbResizer){window._kbResizer=sizeBoard;window.addEventListener("resize",sizeBoard,{passive:true});}
+    }
   }
 }
 function dealCard(d,q){
