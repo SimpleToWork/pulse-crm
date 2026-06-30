@@ -427,6 +427,7 @@
   .qb-qty{font-size:13px;font-weight:700;min-width:16px;text-align:center;font-family:'Space Grotesk',sans-serif;}
   .qb-step-lbl{font-size:10.5px;color:var(--faint);margin-left:auto;}
   .qb-inputs3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .qb-inputs2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .qb-sum{padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;}
   .qb-sum-h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--faint);}
   .qb-sum-block{}
@@ -446,7 +447,7 @@
   .qs-int-table input:focus{outline:none;border-color:var(--accent);}
   .qs-int-table td{padding:5px 7px;border-bottom:1px solid var(--line);}
   .qs-int-table th{padding:8px 7px;}
-  @media(max-width:760px){.qb-grid{grid-template-columns:1fr;}.qb-side{border-left:none;border-top:1px solid var(--line);}.qb-inputs3{grid-template-columns:1fr;}}
+  @media(max-width:760px){.qb-grid{grid-template-columns:1fr;}.qb-side{border-left:none;border-top:1px solid var(--line);}.qb-inputs3,.qb-inputs2{grid-template-columns:1fr;}}
 
   /* ---------- bulk upload modal ---------- */
   .bulk-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadein .15s ease;}
@@ -510,6 +511,19 @@
   .clay-badge.ok{background:var(--ok-soft);color:var(--ok);}
   .clay-badge.warn{background:var(--warn-soft);color:var(--warn);}
 
+  /* ---------- quote builder — excel integration table ---------- */
+  .qb-int-wrap{overflow:auto;max-height:380px;border:1px solid var(--line);border-radius:var(--r-sm);}
+  .qb-int-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .qb-int-tbl thead th{position:sticky;top:0;z-index:1;background:var(--surface-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--muted);padding:7px 10px;border-bottom:2px solid var(--line);white-space:nowrap;}
+  .qb-int-tbl td{padding:5px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  .qb-int-tbl tr.qb-lvl-hdr td{background:var(--surface-2);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);padding:4px 10px;border-bottom:1px solid var(--line);}
+  .qb-int-tbl tr:not(.qb-lvl-hdr):hover td{background:var(--surface-2);cursor:pointer;}
+  .qb-int-tbl tr.on td{background:var(--accent-soft);}
+  .qb-int-tbl tr.on:hover td{filter:brightness(.97);}
+  .qb-cb{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);}
+  .qb-int-inp{width:88px;border:1px solid var(--line);border-radius:var(--r-sm);padding:3px 7px;font-size:12px;background:var(--surface);color:var(--ink);text-align:right;display:block;}
+  .qb-int-inp:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+  .qb-int-name{font-size:13px;}
   /* ---------- templates ---------- */
   .tmpl-preview{-webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);}
 </style>
@@ -592,32 +606,55 @@ const AI_FIELDS=[
   {k:"hardCap",l:"Per-user hard cap (× quota)",step:0.5},
 ];
 // Default integration / implementation pricing table. Admins can edit names,
-// implementation cost, timeline (days), and monthly cost; only future quotes
-// reflect edits. [name, implCost, timelineDays, monthlyCost]
+// implementation cost, timeline (days), monthly cost, and level (1-5).
+// level: 1=Basic, 2=Standard, 3=Advanced, 4=Enterprise Data, 5=Complex/Legacy
 const DEFAULT_INTEGRATIONS=[
-  // Generic / custom
-  ["OAuth",2500,7,150],["Database",4000,10,200],["API",3500,10,200],["Other",3000,10,150],
-  // E-commerce & marketplaces
-  ["NetSuite",5000,21,1000],["Shopify Plus",5000,14,1000],["BigCommerce",5000,14,1000],
-  ["Amazon",5000,14,1000],["Walmart",5000,14,1000],["Extensiv",5000,14,1000],
-  ["ShipStation",5000,14,1000],["QuickBooks",5000,14,1000],["Magento",5000,14,1000],
-  ["Retail Pro",5000,14,1000],["Heartland Retail",5000,14,1000],["Lightspeed",5000,14,1000],
-  ["Shopify",5000,14,1000],["Stripe",5000,10,1000],
-  // Analytics & databases
-  ["Snowflake",5000,14,1000],["BigQuery",5000,14,1000],["PostgreSQL",5000,14,1000],
-  ["MySQL/MariaDB",5000,14,1000],["Microsoft SQL Server",5000,14,1000],["MongoDB",5000,14,1000],
-  ["Oracle DB",5000,21,1000],
-  // CRM & business apps
-  ["Salesforce",5000,14,1000],["HubSpot",5000,14,1000],["Zendesk",5000,14,1000],
-  ["SAP",5000,21,1000],["Jira/Atlassian",5000,14,1000],
-  // Advertising & marketing
-  ["Meta",5000,14,1000],["Amazon Seller/Ads",5000,14,1000],["Google Ads",5000,14,1000],
-  ["Meta Ads",5000,14,1000],["Google Analytics (GA4)",5000,14,1000],
-  // Files & data pipelines
-  ["Google Sheets",5000,10,1000],["Excel/SharePoint",5000,10,1000],
-  ["CSV/Flat Files (S3)",5000,7,1000],["REST API/Webhooks",5000,10,1000],
-  ["Kafka/Streaming",5000,14,1000],
-].map(([name,implCost,timeline,monthlyCost],i)=>({id:"int"+i,name,implCost,timeline,monthlyCost}));
+  // Level 1 — Basic
+  {id:"int0",name:"CSV / Flat Files (S3)",implCost:1500,timeline:5,monthlyCost:100,level:1},
+  {id:"int1",name:"REST API / Webhooks",implCost:2000,timeline:7,monthlyCost:150,level:1},
+  {id:"int2",name:"OAuth",implCost:2500,timeline:7,monthlyCost:150,level:1},
+  {id:"int3",name:"Google Sheets",implCost:2000,timeline:7,monthlyCost:150,level:1},
+  {id:"int4",name:"Excel / SharePoint",implCost:2500,timeline:7,monthlyCost:150,level:1},
+  {id:"int5",name:"Other",implCost:3000,timeline:10,monthlyCost:150,level:1},
+  // Level 2 — Standard
+  {id:"int6",name:"API (Custom)",implCost:3500,timeline:10,monthlyCost:200,level:2},
+  {id:"int7",name:"Database (Generic)",implCost:4000,timeline:10,monthlyCost:200,level:2},
+  {id:"int8",name:"Stripe",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int9",name:"QuickBooks",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int10",name:"HubSpot",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int11",name:"Zendesk",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int12",name:"Jira / Atlassian",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int13",name:"Meta Ads",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int14",name:"Google Ads",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int15",name:"Google Analytics (GA4)",implCost:4000,timeline:10,monthlyCost:500,level:2},
+  {id:"int16",name:"Shopify",implCost:5000,timeline:14,monthlyCost:750,level:2},
+  // Level 3 — Advanced
+  {id:"int17",name:"NetSuite",implCost:6000,timeline:21,monthlyCost:1000,level:3},
+  {id:"int18",name:"Shopify Plus",implCost:6000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int19",name:"BigCommerce",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int20",name:"Amazon",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int21",name:"Walmart",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int22",name:"Extensiv",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int23",name:"ShipStation",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int24",name:"Magento",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int25",name:"Retail Pro",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int26",name:"Heartland Retail",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int27",name:"Lightspeed",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int28",name:"Salesforce",implCost:6000,timeline:21,monthlyCost:1000,level:3},
+  {id:"int29",name:"Meta",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  {id:"int30",name:"Amazon Seller / Ads",implCost:5000,timeline:14,monthlyCost:1000,level:3},
+  // Level 4 — Enterprise Data
+  {id:"int31",name:"Snowflake",implCost:6000,timeline:14,monthlyCost:1000,level:4},
+  {id:"int32",name:"BigQuery",implCost:6000,timeline:14,monthlyCost:1000,level:4},
+  {id:"int33",name:"PostgreSQL",implCost:5000,timeline:14,monthlyCost:800,level:4},
+  {id:"int34",name:"MySQL / MariaDB",implCost:5000,timeline:14,monthlyCost:800,level:4},
+  {id:"int35",name:"MongoDB",implCost:6000,timeline:14,monthlyCost:1000,level:4},
+  {id:"int36",name:"Kafka / Streaming",implCost:7000,timeline:14,monthlyCost:1000,level:4},
+  // Level 5 — Complex / Legacy
+  {id:"int37",name:"Oracle DB",implCost:8000,timeline:21,monthlyCost:1500,level:5},
+  {id:"int38",name:"Microsoft SQL Server",implCost:7000,timeline:21,monthlyCost:1200,level:5},
+  {id:"int39",name:"SAP",implCost:8000,timeline:21,monthlyCost:1500,level:5},
+];
 const QUOTE_STATUSES=["draft","sent","accepted","expired"];
 const QUOTE_STATUS_COLOR={draft:"#94a3b8",sent:"#5b5bf0",accepted:"#16a34a",expired:"#dc2626"};
 
@@ -2807,8 +2844,9 @@ function renderSettings(c){
       <div class="panel-head"><h2>Integration Pricing</h2><div style="display:flex;gap:8px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · future quotes only</span><button class="btn sm primary" id="addintprice">${I.plus}Add integration</button></div></div>
       <div class="faint" style="font-size:12px;margin-bottom:12px">Implementation cost and monthly fee per platform. Auto-populated from defaults. Edit any row to override pricing for future quotes — saved quotes stay frozen.</div>
       <div style="overflow-x:auto"><table class="qs-int-table" style="width:100%;border-collapse:collapse">
-        <thead><tr><th style="text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Platform / Integration</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Impl Cost</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Timeline</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Monthly</th><th style="padding:8px 6px;border-bottom:1px solid var(--line)"></th></tr></thead>
-        <tbody>${intPricing.integrations.map(it=>`<tr>
+        <thead><tr><th style="text-align:center;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap">Level</th><th style="text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Platform / Integration</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Impl Cost</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Timeline</th><th style="text-align:right;font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Monthly</th><th style="padding:8px 6px;border-bottom:1px solid var(--line)"></th></tr></thead>
+        <tbody>${intPricing.integrations.slice().sort((a,b)=>((a.level||1)-(b.level||1))||a.name.localeCompare(b.name)).map(it=>`<tr>
+          <td style="font-size:12px;text-align:center;padding:7px 10px"><span class="chip" style="font-size:10.5px;font-weight:700">${it.level||1}</span></td>
           <td style="font-size:13px;font-weight:500;padding:7px 10px">${esc(it.name)}</td>
           <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${money(it.implCost)}</td>
           <td style="font-size:13px;text-align:right;padding:7px 10px;color:var(--muted)">${it.timeline} days</td>
@@ -2890,6 +2928,7 @@ function integrationPricingModal(intId,contentEl){
   const close=()=>overlay.remove();
   overlay.onclick=e=>{if(e.target===overlay)close();};
 
+  const lvlOpts=[1,2,3,4,5].map(n=>`<option value="${n}" ${(existing?.level||1)===n?"selected":""}>${n} — ${["Basic","Standard","Advanced","Enterprise Data","Complex / Legacy"][n-1]}</option>`).join("");
   overlay.innerHTML=`<div class="q-box" style="width:min(480px,100%);max-height:92vh">
     <div class="q-head"><h2>${existing?I.edit+" Edit integration":I.plus+" Add integration"}</h2><button class="iconbtn" id="ipX">${I.x}</button></div>
     <div class="q-scroll" style="padding:20px;display:flex;flex-direction:column;gap:14px">
@@ -2897,6 +2936,10 @@ function integrationPricingModal(intId,contentEl){
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Platform / Integration name *</label>
         <input id="ip-name" class="input" style="width:100%" placeholder="e.g. Shopify Plus" value="${esc(existing?.name||"")}">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Level (1 = Basic → 5 = Complex / Legacy) *</label>
+        <select id="ip-level" class="input" style="width:100%">${lvlOpts}</select>
       </div>
       <div class="field-row">
         <div style="flex:1">
@@ -2923,6 +2966,7 @@ function integrationPricingModal(intId,contentEl){
   overlay.querySelector("#ipCancel").onclick=close;
   overlay.querySelector("#ipSave").onclick=async()=>{
     const name=overlay.querySelector("#ip-name").value.trim();
+    const level=parseInt(overlay.querySelector("#ip-level").value)||1;
     const implCost=parseFloat(overlay.querySelector("#ip-impl").value)||0;
     const timeline=parseInt(overlay.querySelector("#ip-days").value)||0;
     const monthlyCost=parseFloat(overlay.querySelector("#ip-monthly").value)||0;
@@ -2931,10 +2975,10 @@ function integrationPricingModal(intId,contentEl){
     const freshQs=getQuoteSettings();
     let newInts;
     if(existing){
-      newInts=freshQs.integrations.map(x=>x.id===intId?{...x,name,implCost,timeline,monthlyCost}:x);
+      newInts=freshQs.integrations.map(x=>x.id===intId?{...x,name,level,implCost,timeline,monthlyCost}:x);
     } else {
       const newId="int"+Date.now()+(Math.random()*1e4|0);
-      newInts=[...freshQs.integrations,{id:newId,name,implCost,timeline,monthlyCost}];
+      newInts=[...freshQs.integrations,{id:newId,name,level,implCost,timeline,monthlyCost}];
     }
     const ok=freshQs._id
       ?await dbUpdate("quoteSettings",freshQs._id,{integrations:newInts},true)
@@ -3408,21 +3452,20 @@ function aiDerived(ai){
 function computeQuoteTotals(q){
   const d=aiDerived(q.ai);
   const ints=q.integrations||[];
-  const implementation=ints.reduce((s,it)=>s+(+it.implCost||0)*(+it.qty||1),0);
-  const perIntegrationMonthly=ints.reduce((s,it)=>s+(+it.monthlyCost||0)*(+it.qty||1),0);
+  const implementation=ints.reduce((s,it)=>s+(+(it.quotedImplCost!=null?it.quotedImplCost:it.implCost)||0)*(+it.qty||1),0);
+  const perIntegrationMonthly=ints.reduce((s,it)=>s+(+(it.quotedMonthlyCost!=null?it.quotedMonthlyCost:it.monthlyCost)||0)*(+it.qty||1),0);
   const timelineDays=ints.reduce((m,it)=>Math.max(m,+it.timeline||0),0);
   const users=Math.max(0,+(q.users?.count)||0);
   const pricePerUser=Math.max(0,+(q.users?.pricePerUser)||0);
-  const mult=Math.max(0,+(q.users?.aiMultiplier)||0);
   const aiPricePerUser=(state._aiCostPerUser>0?state._aiCostPerUser:d.fullyLoaded); // prefer Settings override, else computed
-  const aiMonthly=users*aiPricePerUser*mult;
+  const aiMonthly=users*aiPricePerUser;
   const seatMonthly=users*pricePerUser;
   const bundleMonthly=Math.max(0,+(q.addons?.bundlePrice)||0);
   const dataMonthly=Math.max(0,+(q.addons?.dataVolume)||0);
   const monthly=aiMonthly+seatMonthly+bundleMonthly+dataMonthly;
   const annual=monthly*12;
   const processingCost=seatMonthly*(q.ai?.paymentProcessing||0);
-  return {implementation,perIntegrationMonthly,timelineDays,aiPricePerUser,aiMonthly,seatMonthly,bundleMonthly,dataMonthly,monthly,annual,processingCost,users,pricePerUser,mult};
+  return {implementation,perIntegrationMonthly,timelineDays,aiPricePerUser,aiMonthly,seatMonthly,bundleMonthly,dataMonthly,monthly,annual,processingCost,users,pricePerUser};
 }
 function quoteContext(){
   const Q=live(state.quotes);
@@ -3494,10 +3537,15 @@ function renderQuotes(c){
 function quoteBuilderModal(prefill){
   const settings=getQuoteSettings(); // SNAPSHOT basis — captured now, frozen into the saved quote.
   const ai=settings.ai, derived=aiDerived(ai);
-  // selection map {integrationId: qty}
-  const sel={};
+  // sel: Set of selected integration IDs
+  const sel=new Set();
+  // quoted: overridden prices per integration {intId: {implCost, monthlyCost}}
+  const quoted={};
   if(prefill&&Array.isArray(prefill.integrations)){
-    prefill.integrations.forEach(pi=>{const m=settings.integrations.find(it=>it.name===pi.name);if(m)sel[m.id]=+pi.qty||1;});
+    prefill.integrations.forEach(pi=>{
+      const m=settings.integrations.find(it=>it.name===pi.name);
+      if(m){sel.add(m.id);quoted[m.id]={implCost:pi.quotedImplCost??pi.implCost,monthlyCost:pi.quotedMonthlyCost??pi.monthlyCost};}
+    });
   }
   let bundleTouched=!!(prefill&&prefill.addons&&prefill.addons.bundlePrice!=null);
 
@@ -3513,22 +3561,29 @@ function quoteBuilderModal(prefill){
   const ctOptsFor=coId=>[{v:"",l:"— No contact —"},...live(state.contacts).filter(ct=>!coId||ct.companyId===coId).map(ct=>({v:ct.id,l:contactName(ct)}))];
   const preCt=prefill?.contactId||"";
 
-  const intCards=settings.integrations.map(it=>`
-    <div class="qb-card" data-int-id="${esc(it.id)}">
-      <div class="qb-card-top">
-        <div class="qb-check">${I.check}</div>
-        <div style="flex:1;min-width:0">
-          <div class="qb-name">${esc(it.name)}</div>
-          <div class="qb-meta">${money(it.implCost)} impl · ${it.timeline}d · ${money(it.monthlyCost)}/mo</div>
-        </div>
-      </div>
-      <div class="qb-step" style="display:none">
-        <button type="button" class="qb-step-btn" data-step="-" data-id="${esc(it.id)}">−</button>
-        <span class="qb-qty" data-qty="${esc(it.id)}">0</span>
-        <button type="button" class="qb-step-btn" data-step="+" data-id="${esc(it.id)}">＋</button>
-        <span class="qb-step-lbl">accounts</span>
-      </div>
-    </div>`).join("");
+  // Build Excel-style integration table grouped by level (1–5)
+  const LEVEL_NAMES={1:"Level 1 — Basic",2:"Level 2 — Standard",3:"Level 3 — Advanced",4:"Level 4 — Enterprise Data",5:"Level 5 — Complex / Legacy"};
+  const sortedInts=settings.integrations.slice().sort((a,b)=>((a.level||1)-(b.level||1))||a.name.localeCompare(b.name));
+  const levels=[...new Set(sortedInts.map(it=>it.level||1))].sort((a,b)=>a-b);
+  const intRows=levels.flatMap(lvl=>{
+    const group=sortedInts.filter(it=>(it.level||1)===lvl);
+    return [
+      `<tr class="qb-lvl-hdr" data-level="${lvl}"><td colspan="6">${esc(LEVEL_NAMES[lvl]||"Level "+lvl)}</td></tr>`,
+      ...group.map(it=>{
+        const isOn=sel.has(it.id);
+        const qi=quoted[it.id]?.implCost??it.implCost;
+        const qm=quoted[it.id]?.monthlyCost??it.monthlyCost;
+        return `<tr data-int-id="${esc(it.id)}" class="${isOn?"on":""}">
+          <td style="text-align:center;width:30px"><input type="checkbox" class="qb-cb" data-id="${esc(it.id)}" ${isOn?"checked":""}></td>
+          <td class="qb-int-name" style="font-weight:${isOn?600:400}">${esc(it.name)}</td>
+          <td style="text-align:right;color:var(--muted);white-space:nowrap;font-size:12px">${money(it.implCost)}</td>
+          <td style="text-align:right;color:var(--muted);white-space:nowrap;font-size:12px">${money(it.monthlyCost)}/mo</td>
+          <td style="padding:4px 6px"><input type="number" class="qb-int-inp qb-qi" data-id="${esc(it.id)}" min="0" step="100" value="${qi}"></td>
+          <td style="padding:4px 6px"><input type="number" class="qb-int-inp qb-qm" data-id="${esc(it.id)}" min="0" step="25" value="${qm}"></td>
+        </tr>`;
+      })
+    ];
+  }).join("");
 
   overlay.innerHTML=`<div class="q-box qb-box">
     <div class="q-head"><h2>${I.calc} New quote</h2>
@@ -3547,18 +3602,28 @@ function quoteBuilderModal(prefill){
           <div class="field" style="margin-bottom:0"><label>Contact (optional)</label><select id="qb-contact">${ctOptsFor(preCo).map(o=>opt(o,preCt)).join("")}</select></div>
         </div>
         <div class="qb-section">
-          <div class="qb-h">1 · Integrations <span class="qb-h-sub">click to select · use ＋ / − for multiple accounts</span></div>
+          <div class="qb-h">1 · Integrations <span class="qb-h-sub">check to select · edit quoted fees to override pricing</span></div>
           <div style="margin-bottom:8px"><input id="qb-int-search" type="search" placeholder="Search integrations…" style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:13px;" autocomplete="off"></div>
-          <div class="qb-int">${intCards}</div>
-          <div id="qb-int-empty" style="display:none;font-size:12px;color:var(--faint);padding:8px 0">No integrations match your search.</div>
+          <div class="qb-int-wrap">
+            <table class="qb-int-tbl">
+              <thead><tr>
+                <th style="width:30px"></th>
+                <th style="text-align:left">Integration</th>
+                <th style="text-align:right">Rec. Impl</th>
+                <th style="text-align:right">Rec. Monthly</th>
+                <th style="text-align:right">Quoted Impl ($)</th>
+                <th style="text-align:right">Quoted Monthly ($)</th>
+              </tr></thead>
+              <tbody>${intRows}</tbody>
+            </table>
+          </div>
+          <div id="qb-int-empty" style="display:none;font-size:12px;color:var(--faint);padding:6px 0">No integrations match your search.</div>
         </div>
         <div class="qb-section">
           <div class="qb-h">2 · Users &amp; AI</div>
-          <div class="qb-inputs3">
+          <div class="qb-inputs2">
             <div class="field" style="margin:0"><label>AI users (seats)</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??20}"></div>
             <div class="field" style="margin:0"><label>Price / user / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??25}"></div>
-            <div class="field" style="margin:0"><label>AI usage multiplier (×)</label>
-              <input id="qb-mult" type="number" min="0" step="0.1" value="${prefill?.users?.aiMultiplier??1}"></div>
           </div>
         </div>
         <div class="qb-section">
@@ -3568,7 +3633,7 @@ function quoteBuilderModal(prefill){
             <div class="field" style="margin:0"><label>Data volume tier</label><select id="qb-data">${[[0,"Standard — $0"],[1000,"Enhanced — $1,000"],[2000,"Extra — $2,000"],[3000,"Enterprise — $3,000"]].map(([v,l])=>`<option value="${v}" ${(prefill?.addons?.dataVolume??0)==v?"selected":""}>${l}</option>`).join("")}</select></div>
             <div class="field" style="margin:0"><label>Status</label><select id="qb-status">${QUOTE_STATUSES.map(s=>`<option value="${s}" ${(prefill?.status||"draft")===s?"selected":""}>${s}</option>`).join("")}</select></div>
           </div>
-          <div class="faint" style="font-size:11.5px;margin-top:6px">Bundle auto-fills from the selected integrations' monthly cost — edit it to quote a flat package price.</div>
+          <div class="faint" style="font-size:11.5px;margin-top:6px">Bundle auto-fills from quoted integration monthly totals — edit to quote a flat package price.</div>
         </div>
       </div>
       <div class="qb-side">
@@ -3584,12 +3649,21 @@ function quoteBuilderModal(prefill){
 
   const box=overlay.querySelector(".qb-box");
   const numIn=id=>{const e=overlay.querySelector("#"+id);return e?parseFloat(e.value)||0:0;};
-  const collect=()=>({
-    integrations:settings.integrations.filter(it=>sel[it.id]>0).map(it=>({...it,qty:sel[it.id]})),
-    users:{count:numIn("qb-users"),pricePerUser:numIn("qb-price"),aiMultiplier:parseFloat(overlay.querySelector("#qb-mult").value)||0},
-    addons:{bundlePrice:numIn("qb-bundle"),dataVolume:numIn("qb-data")},
-    ai,
-  });
+
+  // collect current form state — reads quoted prices from table inputs
+  const collect=()=>{
+    const selectedInts=settings.integrations.filter(it=>sel.has(it.id)).map(it=>{
+      const qi=box.querySelector(`input.qb-qi[data-id="${it.id}"]`);
+      const qm=box.querySelector(`input.qb-qm[data-id="${it.id}"]`);
+      return {...it,qty:1,quotedImplCost:qi?parseFloat(qi.value)||0:it.implCost,quotedMonthlyCost:qm?parseFloat(qm.value)||0:it.monthlyCost};
+    });
+    return {
+      integrations:selectedInts,
+      users:{count:numIn("qb-users"),pricePerUser:numIn("qb-price")},
+      addons:{bundlePrice:numIn("qb-bundle"),dataVolume:numIn("qb-data")},
+      ai,
+    };
+  };
 
   function summaryHtml(q,t){
     const line=(l,v,sub)=>`<div class="qb-line"><span>${l}${sub?`<span class="qb-line-sub">${sub}</span>`:""}</span><b>${v}</b></div>`;
@@ -3603,7 +3677,7 @@ function quoteBuilderModal(prefill){
       </div>
       <div class="qb-sum-block">
         <div class="qb-sum-lbl">Monthly subscription</div>
-        ${line("AI usage",money(t.aiMonthly),`${t.users} × ${fmtUSD(t.aiPricePerUser)} × ${t.mult}×`)}
+        ${line("AI usage",money(t.aiMonthly),`${t.users} × ${fmtUSD(t.aiPricePerUser)}`)}
         ${line("User seats",money(t.seatMonthly),`${t.users} × ${money(t.pricePerUser)}`)}
         ${line("Integration bundle",money(t.bundleMonthly))}
         ${line("Data volume",money(t.dataMonthly))}
@@ -3621,41 +3695,41 @@ function quoteBuilderModal(prefill){
   }
 
   function paint(){
-    box.querySelectorAll("[data-int-id]").forEach(card=>{
-      const id=card.dataset.intId;const qty=sel[id]||0;
-      card.classList.toggle("on",qty>0);
-      const stp=card.querySelector(".qb-step");if(stp)stp.style.display=qty>0?"flex":"none";
-      const qd=card.querySelector(".qb-qty");if(qd)qd.textContent=qty;
+    box.querySelectorAll("tr[data-int-id]").forEach(tr=>{
+      const on=sel.has(tr.dataset.intId);
+      tr.classList.toggle("on",on);
+      const nm=tr.querySelector(".qb-int-name");if(nm)nm.style.fontWeight=on?600:400;
     });
     const q=collect();const t=computeQuoteTotals(q);
     if(!bundleTouched){const be=overlay.querySelector("#qb-bundle");if(be)be.value=Math.round(t.perIntegrationMonthly);}
     overlay.querySelector("#qb-summary").innerHTML=summaryHtml(collect(),computeQuoteTotals(collect()));
   }
 
-  // wire integration cards
-  box.querySelectorAll("[data-int-id]").forEach(card=>{
-    card.onclick=e=>{if(e.target.closest(".qb-step-btn"))return;const id=card.dataset.intId;sel[id]=sel[id]>0?0:1;paint();};
+  // wire table rows — checkbox or row click toggles selection
+  box.querySelectorAll("tr[data-int-id]").forEach(tr=>{
+    const cb=tr.querySelector(".qb-cb");
+    const toggle=()=>{const id=tr.dataset.intId;if(sel.has(id))sel.delete(id);else sel.add(id);paint();};
+    if(cb)cb.onchange=toggle;
+    tr.onclick=e=>{if(e.target===cb||e.target.closest("input"))return;toggle();};
   });
-  box.querySelectorAll(".qb-step-btn").forEach(btn=>btn.onclick=e=>{
-    e.stopPropagation();const id=btn.dataset.id;const cur=sel[id]||0;
-    sel[id]=btn.dataset.step==="+"?cur+1:Math.max(0,cur-1);paint();
-  });
+  // quoted price inputs trigger repaint
+  box.querySelectorAll(".qb-qi,.qb-qm").forEach(inp=>inp.oninput=paint);
   // integration search filter
   const intSearch=overlay.querySelector("#qb-int-search");
   const intEmpty=overlay.querySelector("#qb-int-empty");
   intSearch.oninput=()=>{
     const q=intSearch.value.trim().toLowerCase();
-    let visible=0;
-    box.querySelectorAll("[data-int-id]").forEach(card=>{
-      const name=(card.querySelector(".qb-name")||{}).textContent||"";
+    const visCount={};
+    box.querySelectorAll("tr[data-int-id]").forEach(tr=>{
+      const name=(tr.querySelector(".qb-int-name")||{}).textContent||"";
       const show=!q||name.toLowerCase().includes(q);
-      card.style.display=show?"":"none";
-      if(show)visible++;
+      tr.style.display=show?"":"none";
+      if(show){const lvl=settings.integrations.find(it=>it.id===tr.dataset.intId)?.level||1;visCount[lvl]=(visCount[lvl]||0)+1;}
     });
-    intEmpty.style.display=visible===0?"":"none";
+    box.querySelectorAll("tr.qb-lvl-hdr").forEach(tr=>{const lvl=+tr.dataset.level;tr.style.display=(!q||visCount[lvl])?"":"none";});
+    intEmpty.style.display=(q&&!Object.keys(visCount).length)?"":"none";
   };
   ["qb-users","qb-price","qb-data"].forEach(id=>{const e=overlay.querySelector("#"+id);if(e)e.oninput=paint;});
-  overlay.querySelector("#qb-mult").onchange=paint;
   overlay.querySelector("#qb-bundle").oninput=()=>{bundleTouched=true;paint();};
   // Bidirectional company ↔ contact linking
   const coSel=overlay.querySelector("#qb-company");
@@ -3690,7 +3764,7 @@ function quoteBuilderModal(prefill){
       companyId:overlay.querySelector("#qb-company").value||null,
       contactId:overlay.querySelector("#qb-contact").value||null,
       status:overlay.querySelector("#qb-status").value||"draft",
-      integrations:q.integrations.map(it=>({name:it.name,implCost:it.implCost,timeline:it.timeline,monthlyCost:it.monthlyCost,qty:it.qty})),
+      integrations:q.integrations.map(it=>({name:it.name,implCost:it.implCost,timeline:it.timeline,monthlyCost:it.monthlyCost,qty:it.qty,level:it.level||1,quotedImplCost:it.quotedImplCost,quotedMonthlyCost:it.quotedMonthlyCost})),
       users:q.users,
       addons:q.addons,
       // immutable snapshot of the settings active right now
@@ -3724,8 +3798,8 @@ function quoteViewModal(quote){
   overlay.onclick=e=>{if(e.target===overlay)close();};
 
   const intTable=ints.length?`<table class="qtable">
-    <thead><tr><th>Integration</th><th style="text-align:center">Qty</th><th style="text-align:right">Impl (each)</th><th style="text-align:right">Impl total</th><th style="text-align:right">Monthly</th></tr></thead>
-    <tbody>${ints.map(it=>`<tr><td>${esc(it.name)}</td><td style="text-align:center">${it.qty}</td><td style="text-align:right">${money(it.implCost)}</td><td style="text-align:right">${money(it.implCost*it.qty)}</td><td style="text-align:right">${money(it.monthlyCost*it.qty)}</td></tr>`).join("")}</tbody>
+    <thead><tr><th>Integration</th><th style="text-align:center">Lvl</th><th style="text-align:right">Rec. Impl</th><th style="text-align:right">Rec. Monthly</th><th style="text-align:right">Quoted Impl</th><th style="text-align:right">Quoted Monthly</th></tr></thead>
+    <tbody>${ints.map(it=>{const qi=it.quotedImplCost??it.implCost;const qm=it.quotedMonthlyCost??it.monthlyCost;return `<tr><td>${esc(it.name)}</td><td style="text-align:center;font-size:11px;color:#999">${it.level||"—"}</td><td style="text-align:right;color:#999">${money(it.implCost)}</td><td style="text-align:right;color:#999">${money(it.monthlyCost)}/mo</td><td style="text-align:right;font-weight:600">${money(qi)}</td><td style="text-align:right;font-weight:600">${money(qm)}/mo</td></tr>`;}).join("")}</tbody>
   </table>`:`<div class="faint" style="font-size:13px">No integrations selected.</div>`;
 
   const docHtml=`<div class="q-doc">
@@ -3737,7 +3811,7 @@ function quoteViewModal(quote){
     </div>
     <div class="qsec"><h3>Integrations &amp; implementation</h3>${intTable}</div>
     <div class="qsec"><h3>Monthly subscription</h3><table class="qtable"><tbody>
-      <tr><td>AI usage <span style="color:#999">(${t.users} users × ${fmtUSD(t.aiPricePerUser)} × ${t.mult}×)</span></td><td style="text-align:right">${money(t.aiMonthly)}</td></tr>
+      <tr><td>AI usage <span style="color:#999">(${t.users} users × ${fmtUSD(t.aiPricePerUser)})</span></td><td style="text-align:right">${money(t.aiMonthly)}</td></tr>
       <tr><td>User seats <span style="color:#999">(${t.users} × ${money(t.pricePerUser)})</span></td><td style="text-align:right">${money(t.seatMonthly)}</td></tr>
       <tr><td>Integration bundle</td><td style="text-align:right">${money(t.bundleMonthly)}</td></tr>
       <tr><td>Data volume add-on</td><td style="text-align:right">${money(t.dataMonthly)}</td></tr>
@@ -3773,7 +3847,7 @@ function quoteViewModal(quote){
 
   const plain=()=>{
     const il=ints.map(it=>`  ${(it.name+" ×"+it.qty).padEnd(30)} impl ${money(it.implCost*it.qty)}  mo ${money(it.monthlyCost*it.qty)}`).join("\n");
-    return `QUOTE — ${quote.name||""}\nDate: ${qDate}   Status: ${quote.status||"draft"}\n\nBILL TO: ${co?.name||"—"}${ct?" / "+contactName(ct):""}\n\nINTEGRATIONS & IMPLEMENTATION:\n${il||"  (none)"}\n\nMONTHLY:\n  AI usage (${t.users} × ${fmtUSD(t.aiPricePerUser)} × ${t.mult}x): ${money(t.aiMonthly)}\n  User seats (${t.users} × ${money(t.pricePerUser)}): ${money(t.seatMonthly)}\n  Integration bundle: ${money(t.bundleMonthly)}\n  Data volume: ${money(t.dataMonthly)}\n\n  Implementation (one-time): ${money(t.implementation)}\n  Monthly subscription:      ${money(t.monthly)}\n  Annual subscription:       ${money(t.annual)}${t.timelineDays?`\n  Est. timeline:             ${t.timelineDays} days`:""}\n\nPricing frozen at creation. Subject to final contract terms.`;
+    return `QUOTE — ${quote.name||""}\nDate: ${qDate}   Status: ${quote.status||"draft"}\n\nBILL TO: ${co?.name||"—"}${ct?" / "+contactName(ct):""}\n\nINTEGRATIONS & IMPLEMENTATION:\n${il||"  (none)"}\n\nMONTHLY:\n  AI usage (${t.users} × ${fmtUSD(t.aiPricePerUser)}): ${money(t.aiMonthly)}\n  User seats (${t.users} × ${money(t.pricePerUser)}): ${money(t.seatMonthly)}\n  Integration bundle: ${money(t.bundleMonthly)}\n  Data volume: ${money(t.dataMonthly)}\n\n  Implementation (one-time): ${money(t.implementation)}\n  Monthly subscription:      ${money(t.monthly)}\n  Annual subscription:       ${money(t.annual)}${t.timelineDays?`\n  Est. timeline:             ${t.timelineDays} days`:""}\n\nPricing frozen at creation. Subject to final contract terms.`;
   };
   overlay.querySelector("#qvCopy").onclick=()=>navigator.clipboard.writeText(plain()).then(()=>toast("Quote copied","ok")).catch(()=>toast("Copy failed","err"));
   overlay.querySelector("#qvDl").onclick=()=>{const a=document.createElement("a");const slug=(quote.name||"quote").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");a.href=URL.createObjectURL(new Blob([plain()],{type:"text/plain"}));a.download=`${slug||"quote"}.txt`;a.click();URL.revokeObjectURL(a.href);toast("Quote downloaded","ok");};
@@ -3783,7 +3857,7 @@ function quoteViewModal(quote){
     const ctx=`This is a SAVED quote. Use ONLY these snapshotted numbers — do not use current settings or invent values.\n`+
       `Quote: ${quote.name}; company ${co?.name||"—"}.\n`+
       `Integrations: ${ints.map(it=>`${it.name} ×${it.qty} (impl ${money(it.implCost)} ea, ${money(it.monthlyCost)}/mo ea)`).join("; ")||"none"}.\n`+
-      `Users ${t.users} @ ${money(t.pricePerUser)}/seat; AI multiplier ${t.mult}x; AI price/user ${fmtUSD(t.aiPricePerUser)}.\n`+
+      `Users ${t.users} @ ${money(t.pricePerUser)}/seat; AI price/user ${fmtUSD(t.aiPricePerUser)}.\n`+
       `AI snapshot: cost/question ${fmtUSD(d.costPerQuestion,4)}, provisioned ${d.provisionedQuestions} q/user, raw ${fmtUSD(d.rawApiCost)}, fully-loaded ${fmtUSD(d.fullyLoaded)}/user/mo; provisioning buffer ${snapAi.provisioningBuffer}x; budget headroom ${money(d.headroom)}.\n`+
       `Totals: implementation ${money(t.implementation)}, monthly ${money(t.monthly)} (AI ${money(t.aiMonthly)} + seats ${money(t.seatMonthly)} + bundle ${money(t.bundleMonthly)} + data ${money(t.dataMonthly)}), annual ${money(t.annual)}.`;
     try{const txt=await askAI("Explain how this quote's pricing was derived in 4-6 short sentences. Walk through the AI cost chain (cost per question → provisioned questions → fully-loaded per-user cost), then the monthly components. Flag any concern (e.g. negative budget headroom or a high provisioning buffer).",ctx);body.innerHTML=esc(txt).replace(/\n/g,"<br>");}
