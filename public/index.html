@@ -607,53 +607,50 @@ const AI_FIELDS=[
 ];
 // Default integration / implementation pricing table. Admins can edit names,
 // implementation cost, timeline (days), monthly cost, and level (1-5).
-// level: 1=Basic, 2=Standard, 3=Advanced, 4=Enterprise Data, 5=Complex/Legacy
+// level: 1=Rating1, 2=Rating2, 3=Rating3, 4=Rating4, 5=Rating5
 const DEFAULT_INTEGRATIONS=[
-  // Level 1 — Basic
-  {id:"int0",name:"CSV / Flat Files (S3)",implCost:1500,timeline:5,monthlyCost:100,level:1},
-  {id:"int1",name:"REST API / Webhooks",implCost:2000,timeline:7,monthlyCost:150,level:1},
-  {id:"int2",name:"OAuth",implCost:2500,timeline:7,monthlyCost:150,level:1},
-  {id:"int3",name:"Google Sheets",implCost:2000,timeline:7,monthlyCost:150,level:1},
-  {id:"int4",name:"Excel / SharePoint",implCost:2500,timeline:7,monthlyCost:150,level:1},
-  {id:"int5",name:"Other",implCost:3000,timeline:10,monthlyCost:150,level:1},
-  // Level 2 — Standard
-  {id:"int6",name:"API (Custom)",implCost:3500,timeline:10,monthlyCost:200,level:2},
-  {id:"int7",name:"Database (Generic)",implCost:4000,timeline:10,monthlyCost:200,level:2},
-  {id:"int8",name:"Stripe",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int9",name:"QuickBooks",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int10",name:"HubSpot",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int11",name:"Zendesk",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int12",name:"Jira / Atlassian",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int13",name:"Meta Ads",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int14",name:"Google Ads",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int15",name:"Google Analytics (GA4)",implCost:4000,timeline:10,monthlyCost:500,level:2},
-  {id:"int16",name:"Shopify",implCost:5000,timeline:14,monthlyCost:750,level:2},
-  // Level 3 — Advanced
-  {id:"int17",name:"NetSuite",implCost:6000,timeline:21,monthlyCost:1000,level:3},
-  {id:"int18",name:"Shopify Plus",implCost:6000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int19",name:"BigCommerce",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int20",name:"Amazon",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int21",name:"Walmart",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int22",name:"Extensiv",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int23",name:"ShipStation",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int24",name:"Magento",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int25",name:"Retail Pro",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int26",name:"Heartland Retail",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int27",name:"Lightspeed",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int28",name:"Salesforce",implCost:6000,timeline:21,monthlyCost:1000,level:3},
-  {id:"int29",name:"Meta",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  {id:"int30",name:"Amazon Seller / Ads",implCost:5000,timeline:14,monthlyCost:1000,level:3},
-  // Level 4 — Enterprise Data
-  {id:"int31",name:"Snowflake",implCost:6000,timeline:14,monthlyCost:1000,level:4},
-  {id:"int32",name:"BigQuery",implCost:6000,timeline:14,monthlyCost:1000,level:4},
-  {id:"int33",name:"PostgreSQL",implCost:5000,timeline:14,monthlyCost:800,level:4},
-  {id:"int34",name:"MySQL / MariaDB",implCost:5000,timeline:14,monthlyCost:800,level:4},
-  {id:"int35",name:"MongoDB",implCost:6000,timeline:14,monthlyCost:1000,level:4},
-  {id:"int36",name:"Kafka / Streaming",implCost:7000,timeline:14,monthlyCost:1000,level:4},
-  // Level 5 — Complex / Legacy
-  {id:"int37",name:"Oracle DB",implCost:8000,timeline:21,monthlyCost:1500,level:5},
-  {id:"int38",name:"Microsoft SQL Server",implCost:7000,timeline:21,monthlyCost:1200,level:5},
-  {id:"int39",name:"SAP",implCost:8000,timeline:21,monthlyCost:1500,level:5},
+  // Rating 1 — $2,000 impl / $1,000/mo / 5 days
+  {id:"int6",name:"API",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int0",name:"CSV / Flat Files (S3)",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int14",name:"Google Ads",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int15",name:"Google Analytics (GA4)",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int3",name:"Google Sheets",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int29",name:"Meta",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int13",name:"Meta Ads",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int2",name:"OAuth",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int5",name:"Other",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int9",name:"QuickBooks",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int1",name:"REST API / Webhooks",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int23",name:"ShipStation",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int16",name:"Shopify",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int18",name:"Shopify Plus",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int8",name:"Stripe",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  {id:"int11",name:"Zendesk",implCost:2000,timeline:5,monthlyCost:1000,level:1},
+  // Rating 2 — $3,000 impl / $1,500/mo / 10 days
+  {id:"int30",name:"Amazon Seller / Ads",implCost:3000,timeline:10,monthlyCost:1500,level:2},
+  {id:"int27",name:"Lightspeed",implCost:3000,timeline:10,monthlyCost:1500,level:2},
+  {id:"int24",name:"Magento",implCost:3000,timeline:10,monthlyCost:1500,level:2},
+  {id:"int20",name:"Amazon",implCost:3000,timeline:10,monthlyCost:1500,level:2},
+  // Rating 3 — $6,000 impl / $2,000/mo / 15 days
+  {id:"int10",name:"HubSpot",implCost:6000,timeline:15,monthlyCost:2000,level:3},
+  {id:"int25",name:"Retail Pro",implCost:6000,timeline:15,monthlyCost:2000,level:3},
+  {id:"int21",name:"Walmart",implCost:6000,timeline:15,monthlyCost:2000,level:3},
+  // Rating 4 — $8,000 impl / $2,500/mo / 20 days
+  {id:"int32",name:"BigQuery",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int7",name:"Database",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int4",name:"Excel / SharePoint",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int38",name:"Microsoft SQL Server",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int35",name:"MongoDB",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int34",name:"MySQL / MariaDB",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int37",name:"Oracle DB",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int33",name:"PostgreSQL",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  {id:"int31",name:"Snowflake",implCost:8000,timeline:20,monthlyCost:2500,level:4},
+  // Rating 5 — $11,000 impl / $2,500/mo / 25 days
+  {id:"int28",name:"Salesforce",implCost:11000,timeline:25,monthlyCost:2500,level:5},
+  {id:"int19",name:"BigCommerce",implCost:11000,timeline:25,monthlyCost:2500,level:5},
+  {id:"int17",name:"NetSuite",implCost:11000,timeline:25,monthlyCost:2500,level:5},
+  {id:"int39",name:"SAP",implCost:11000,timeline:25,monthlyCost:2500,level:5},
+  {id:"int40",name:"Bluecherry",implCost:11000,timeline:25,monthlyCost:2500,level:5},
 ];
 const QUOTE_STATUSES=["draft","sent","accepted","expired"];
 const QUOTE_STATUS_COLOR={draft:"#94a3b8",sent:"#5b5bf0",accepted:"#16a34a",expired:"#dc2626"};
@@ -2933,7 +2930,7 @@ function integrationPricingModal(intId,contentEl){
   const close=()=>overlay.remove();
   overlay.onclick=e=>{if(e.target===overlay)close();};
 
-  const lvlOpts=[1,2,3,4,5].map(n=>`<option value="${n}" ${(existing?.level||1)===n?"selected":""}>${n} — ${["Basic","Standard","Advanced","Enterprise Data","Complex / Legacy"][n-1]}</option>`).join("");
+  const lvlOpts=[1,2,3,4,5].map(n=>`<option value="${n}" ${(existing?.level||1)===n?"selected":""}>${n} — ${["Rating 1 ($2k impl / $1k/mo / 5d)","Rating 2 ($3k impl / $1.5k/mo / 10d)","Rating 3 ($6k impl / $2k/mo / 15d)","Rating 4 ($8k impl / $2.5k/mo / 20d)","Rating 5 ($11k impl / $2.5k/mo / 25d)"][n-1]}</option>`).join("");
   overlay.innerHTML=`<div class="q-box" style="width:min(480px,100%);max-height:92vh">
     <div class="q-head"><h2>${existing?I.edit+" Edit integration":I.plus+" Add integration"}</h2><button class="iconbtn" id="ipX">${I.x}</button></div>
     <div class="q-scroll" style="padding:20px;display:flex;flex-direction:column;gap:14px">
@@ -2943,7 +2940,7 @@ function integrationPricingModal(intId,contentEl){
         <input id="ip-name" class="input" style="width:100%" placeholder="e.g. Shopify Plus" value="${esc(existing?.name||"")}">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Level (1 = Basic → 5 = Complex / Legacy) *</label>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Rating (1 = Basic → 5 = Complex / Legacy) *</label>
         <select id="ip-level" class="input" style="width:100%">${lvlOpts}</select>
       </div>
       <div class="field-row">
@@ -3567,7 +3564,7 @@ function quoteBuilderModal(prefill){
   const preCt=prefill?.contactId||"";
 
   // Build Excel-style integration table grouped by level (1–5)
-  const LEVEL_NAMES={1:"Level 1 — Basic",2:"Level 2 — Standard",3:"Level 3 — Advanced",4:"Level 4 — Enterprise Data",5:"Level 5 — Complex / Legacy"};
+  const LEVEL_NAMES={1:"Rating 1 — $2k impl / $1k/mo",2:"Rating 2 — $3k impl / $1.5k/mo",3:"Rating 3 — $6k impl / $2k/mo",4:"Rating 4 — $8k impl / $2.5k/mo",5:"Rating 5 — $11k impl / $2.5k/mo"};
   const sortedInts=settings.integrations.slice().sort((a,b)=>((a.level||1)-(b.level||1))||a.name.localeCompare(b.name));
   const levels=[...new Set(sortedInts.map(it=>it.level||1))].sort((a,b)=>a-b);
   const intRows=levels.flatMap(lvl=>{
