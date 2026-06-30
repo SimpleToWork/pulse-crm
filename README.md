@@ -74,9 +74,20 @@ co-located serverless functions.
 
 ### 4) Lock down Firestore before launch
 
-Replace test-mode rules with `firestore.rules.example` (Firebase console → Firestore → Rules).
-Those rules allow access only to signed-in, email-verified users on your Workspace domain, and
-only to the app's collections.
+Deploy the security rules (requires [Firebase CLI](https://firebase.google.com/docs/cli)):
+
+```bash
+npm install -g firebase-tools
+firebase login
+npm run deploy:rules   # or: firebase deploy --only firestore:rules
+```
+
+The rules in `firestore.rules` allow access only to signed-in, email-verified users on your
+Workspace domain, and only to the app's known collections. **This step is required** — without
+it every Firestore write will be rejected with "Missing or insufficient permissions."
+
+> Alternatively, paste the contents of `firestore.rules` into the Firebase console →
+> Firestore Database → Rules tab for project `pulse-crm-60582`.
 
 ## Features
 
