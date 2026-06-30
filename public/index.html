@@ -712,10 +712,10 @@ const state={ page:"dashboard", detail:null, user:null,
   navCollapsed: localStorage.getItem("pulse-nav-collapsed")==="1",
   activityCollapsed: localStorage.getItem("pulse-activity-collapsed")==="1",
   _supTab:"categories",
-  _cSort:{col:"",dir:"asc"}, _cColF:{nameEmail:"",status:"",owner:""},
-  _coSort:{col:"",dir:"asc"}, _coColF:{industry:"",owner:""}, _coTab:"all",
-  _tSort:{col:"due",dir:"asc"}, _tColF:{priority:"",owner:""},
-  _dSort:{col:"",dir:"asc"}, _dView:"", _pipeView:"bars",
+  _cSort:{col:"",dir:"asc"}, _cColF:{nameEmail:"",status:"",owner:"",company:"",createdBy:""},
+  _coSort:{col:"",dir:"asc"}, _coColF:{name:"",industry:"",size:"",minContacts:"",owner:"",createdBy:""}, _coTab:"all",
+  _tSort:{col:"due",dir:"asc"}, _tColF:{priority:"",owner:"",title:"",createdBy:""},
+  _dSort:{col:"",dir:"asc"}, _dColF:{name:"",company:"",owner:"",createdBy:""}, _dView:"", _pipeView:"bars",
   _dSearch: localStorage.getItem("pulse-deals-search")||"",
   _bSearch: localStorage.getItem("pulse-deals-bsearch")||"",
   _dStageF: localStorage.getItem("pulse-deals-stage")||"",
@@ -724,7 +724,7 @@ const state={ page:"dashboard", detail:null, user:null,
   _dDateFrom: localStorage.getItem("pulse-deals-datefrom")||"",
   _dDateTo: localStorage.getItem("pulse-deals-dateto")||"",
   _dealsTf: localStorage.getItem("pulse-deals-tf")||"all", _dealsTfFrom:"", _dealsTfTo:"",
-  _tkSort:{col:"createdAt",dir:"desc"}, _tkColF:{status:"",priority:"",type:""}, _tkSearch:"",
+  _tkSort:{col:"createdAt",dir:"desc"}, _tkColF:{status:"",priority:"",type:"",company:"",contact:"",owner:""}, _tkSearch:"",
   _tmplSearch:"", _tmplCat:"",
   _dashTf: localStorage.getItem("pulse-dash-tf")||"30d", _dashDateFrom:"", _dashDateTo:"",
   _etlInstantlyKey: localStorage.getItem("pulse-instantly-key")||"",
@@ -1579,37 +1579,19 @@ function renderDashboard(c){
       ${stat("Forecast (weighted)",moneyK(forecast),I.bar,"Prob-adjusted","","deals-open")}
       ${stat("Won this period",moneyK(wonVal),I.trophy,won.length+" deals &middot; "+winRate+"% win rate","up","deals-won")}
       ${stat(tf==="all"?"Total contacts":"New contacts",tf==="all"?C.length:newInPeriod,I.users,(tf==="all"?"—":"+"+newInPeriod+" in period"),newInPeriod?"up":"","contacts")}
-      ${stat("Due today",dueToday,I.clock,overdue?overdue+" overdue":"on track",overdue?"down":"up","tasks-today")}
+      ${stat("Due today",dueToday,I.clock,dueToday===1?"1 task due":"tasks due today","","tasks-today")}
+      <div class="card stat${overdue?" od-mini-card":""}" data-dash-nav="tasks-overdue" style="${overdue?"border-left:3px solid var(--danger);cursor:pointer":"cursor:pointer"}">
+        <div class="lbl"><span class="ic" style="background:${overdue?"var(--danger-soft)":"var(--ok-soft,#d1fae5)"};color:${overdue?"var(--danger)":"var(--ok)"}">${I.clock}</span>Overdue tasks</div>
+        <div class="val" style="font-size:24px;color:${overdue?"var(--danger)":"var(--ok)"}">${overdue}</div>
+        <div class="delta ${overdue?"down":"up"}">${overdue?"Need attention":"All on track"}</div>
+      </div>
     </div>
     <div id="weeklyai-out"></div>
     <div class="grid2">
       <div class="card panel"><div class="panel-head"><h2>Pipeline by stage</h2>${viewToggle}</div>${viewContent||emptyMini("No open deals","Add a deal to see your pipeline build.")}</div>
       <div class="card panel"><div class="panel-head"><h2>Recent activity</h2><button class="btn ghost sm" id="activity-toggle" title="${state.activityCollapsed?"Expand":"Collapse"} recent activity" style="padding:3px 7px;font-size:12px">${state.activityCollapsed?I.chevronDown:I.chevronUp}</button></div>${state.activityCollapsed?"":` <div class="timeline">${feed}</div>`}</div>
     </div>
-    ${(()=>{
-      const now=Date.now();
-      const odTasks=T.filter(t=>t.status!=="done"&&isOverdue(t.due)).sort((a,b)=>(a.due||0)-(b.due||0));
-      if(!odTasks.length)return`<div class="card panel" style="margin-top:14px"><div class="panel-head"><h2>${I.clock}Overdue tasks</h2></div>${emptyMini("No overdue tasks","All tasks are on track.")}</div>`;
-      const MAX=8;const shown=odTasks.slice(0,MAX);const extra=odTasks.length-MAX;
-      const daysDiff=t=>Math.max(1,Math.ceil((dayStart(now)-dayStart(t.due))/86400000));
-      const rows=shown.map(t=>{
-        const rel=relLabel(t);const days=daysDiff(t);
-        return `<div class="od-row" data-task-id="${t.id}">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</div>
-            ${rel?`<div class="faint" style="font-size:11.5px;margin-top:2px">${esc(rel)}</div>`:""}
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex:none">
-            <span class="prio ${t.priority||"low"}">${esc(t.priority||"low")}</span>
-            <span style="font-size:12px;color:var(--danger);white-space:nowrap;font-weight:600">${days}d overdue</span>
-            ${t.owner?`<span class="chip" style="font-size:11px">${esc(t.owner)}</span>`:""}
-          </div>
-        </div>`;
-      }).join("");
-      const moreRow=extra>0?`<div style="text-align:center;padding:10px 0;font-size:12px;color:var(--muted)">+${extra} more overdue task${extra!==1?"s":""} — <span style="color:var(--accent);cursor:pointer" id="od-view-all">view all</span></div>`:"";
-      const viewAllBtn=`<button class="btn ghost sm" id="od-view-all-btn" style="font-size:12px">View all (${odTasks.length})</button>`;
-      return `<div class="card panel" style="margin-top:14px"><div class="panel-head"><h2 style="color:var(--danger)">${I.clock}Overdue tasks <span style="font-size:13px;font-weight:500;color:var(--danger);background:var(--danger-soft);border-radius:10px;padding:1px 8px;margin-left:4px">${odTasks.length}</span></h2>${viewAllBtn}</div><div style="display:flex;flex-direction:column;gap:2px">${rows}</div>${moreRow}</div>`;
-    })()}`;
+    `;
   $("#dash-owner-filter").onchange=e=>{state._dashOwner=e.target.value;try{localStorage.setItem("pulse-dash-owner",state._dashOwner);}catch(_){}renderDashboard(c);};
   c.querySelectorAll("[data-dashtf]").forEach(btn=>btn.onclick=()=>{
     state._dashTf=btn.dataset.dashtf;
@@ -1626,13 +1608,11 @@ function renderDashboard(c){
       else if(nav==="deals-open"){state.page="deals";state._dView=state._dView||"board";state._dStageF="";state._dPrioF="";state._dCloseF="";}
       else if(nav==="contacts"){state.page="contacts";}
       else if(nav==="tasks-today"){state.page="tasks";state._tf="today";}
+      else if(nav==="tasks-overdue"){state.page="tasks";state._tf="overdue";}
       state.detail=null;render();
     };
   });
   document.querySelectorAll("[data-pipeview]").forEach(b=>b.onclick=()=>{state._pipeView=b.dataset.pipeview;render();});
-  c.querySelectorAll(".od-row[data-task-id]").forEach(row=>row.onclick=()=>{state.page="tasks";state._tf="overdue";state.detail=null;render();});
-  const odAllBtn=c.querySelector("#od-view-all-btn");if(odAllBtn)odAllBtn.onclick=()=>{state.page="tasks";state._tf="overdue";state.detail=null;render();};
-  const odAllLink=c.querySelector("#od-view-all");if(odAllLink)odAllLink.onclick=()=>{state.page="tasks";state._tf="overdue";state.detail=null;render();};
   $("#weeklyai").onclick=async()=>{
     const btn=$("#weeklyai");btn.disabled=true;btn.innerHTML=`<span class="spin"></span>Analyzing&hellip;`;
     const out=$("#weeklyai-out");
@@ -1704,6 +1684,8 @@ function renderContacts(c){
       if(cf.nameEmail&&!hay.includes(cf.nameEmail.toLowerCase()))return false;
       if(cf.status&&(x.status||"Lead")!==cf.status)return false;
       if(cf.owner&&!(x.owner||"").toLowerCase().includes(cf.owner.toLowerCase()))return false;
+      if(cf.company&&!co.toLowerCase().includes(cf.company.toLowerCase()))return false;
+      if(cf.createdBy&&!(x.createdBy||"").toLowerCase().includes(cf.createdBy.toLowerCase()))return false;
       return true;
     });
     const sc=state._cSort.col,sd=state._cSort.dir;
@@ -1723,12 +1705,12 @@ function renderContacts(c){
     $("#ctable").innerHTML=rows.length?`<table><thead>
       <tr>
         <th class="${thCls("name")}" data-sort="name">Name${SI()}<input class="th-fi" id="cf-cname" placeholder="Filter name/email…" value="${esc(cf.nameEmail||"")}"></th>
-        <th class="${thCls("company")}" data-sort="company">Company${SI()}</th>
+        <th class="${thCls("company")}" data-sort="company">Company${SI()}<input class="th-fi" id="cf-cco" placeholder="Filter company…" value="${esc(cf.company||"")}"></th>
         <th class="${thCls("email")}" data-sort="email">Email${SI()}</th>
         <th class="${thCls("status")}" data-sort="status">Status${SI()}<select class="th-fi" id="cf-cstatus"><option value="">All statuses</option>${["Lead","Qualified","Customer","Churned","Inactive"].map(s=>`<option value="${s}"${cf.status===s?" selected":""}>${s}</option>`).join("")}</select></th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-cowner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
         <th class="${thCls("lastContacted")}" data-sort="lastContacted">Last contacted${SI()}</th>
-        <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}</th>
+        <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-ccrby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
         <th></th>
       </tr>
       </thead><tbody>
@@ -1743,10 +1725,12 @@ function renderContacts(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td></tr>`).join("")}
       </tbody></table>`:emptyState("users","No contacts yet","Add your first contact to start building your pipeline.","New contact","newc2");
     $("#ctable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>setSort(th.dataset.sort));
-    const cfName=$("#cf-cname"),cfSt=$("#cf-cstatus"),cfOw=$("#cf-cowner");
+    const cfName=$("#cf-cname"),cfSt=$("#cf-cstatus"),cfOw=$("#cf-cowner"),cfCo=$("#cf-cco"),cfCrBy=$("#cf-ccrby");
     if(cfName){cfName.oninput=e=>{state._cColF.nameEmail=e.target.value;draw();};cfName.onclick=e=>e.stopPropagation();}
     if(cfSt){cfSt.onchange=e=>{state._cColF.status=e.target.value;draw();};cfSt.onclick=e=>e.stopPropagation();}
     if(cfOw){cfOw.oninput=e=>{state._cColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
+    if(cfCo){cfCo.oninput=e=>{state._cColF.company=e.target.value;draw();};cfCo.onclick=e=>e.stopPropagation();}
+    if(cfCrBy){cfCrBy.oninput=e=>{state._cColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
     $("#ctable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{ if(e.target.closest("[data-edit]"))return; state.detail={type:"contact",id:tr.dataset.id};render(); });
     $("#ctable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();contactForm(b.dataset.edit);});
     const n2=$("#newc2"); if(n2)n2.onclick=()=>contactForm();
@@ -1849,13 +1833,13 @@ function renderCompanies(c){
     const setSort=col=>{if(state._coSort.col===col)state._coSort.dir=state._coSort.dir==="asc"?"desc":"asc";else{state._coSort.col=col;state._coSort.dir="asc";}draw();};
     $("#cotable").innerHTML=rows.length?`<table><thead>
       <tr>
-        <th class="${thCls("name")}" data-sort="name">Company${SI()}</th>
+        <th class="${thCls("name")}" data-sort="name">Company${SI()}<input class="th-fi" id="cf-coname" placeholder="Filter company…" value="${esc(cf.name||"")}"></th>
         <th class="${thCls("industry")}" data-sort="industry">Industry${SI()}<input class="th-fi" id="cf-coind" placeholder="Filter industry…" value="${esc(cf.industry||"")}"></th>
-        <th class="${thCls("size")}" data-sort="size">Size${SI()}</th>
-        <th class="${thCls("contacts")}" data-sort="contacts">Contacts${SI()}</th>
+        <th class="${thCls("size")}" data-sort="size">Size${SI()}<input class="th-fi" id="cf-cosize" placeholder="Filter size…" value="${esc(cf.size||"")}"></th>
+        <th class="${thCls("contacts")}" data-sort="contacts">Contacts${SI()}<select class="th-fi" id="cf-cocts"><option value="">Any</option><option value="1"${cf.minContacts==="1"?" selected":""}>Has contacts</option><option value="2"${cf.minContacts==="2"?" selected":""}>2+</option><option value="5"${cf.minContacts==="5"?" selected":""}>5+</option></select></th>
         <th class="${thCls("openDeals")}" data-sort="openDeals">Open deals${SI()}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-coowner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
-        <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}</th>
+        <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-cocreatedby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
         <th></th>
       </tr>
       </thead><tbody>
@@ -1993,6 +1977,7 @@ function renderDeals(c){
       const q=($("#dsearch")?.value||state._dSearch||"").toLowerCase();
       state._dSearch=q;
       const stg=state._dStageF||"",pr=state._dPrioF||"",cf=state._dCloseF||"";
+      const dcf=state._dColF;
       try{localStorage.setItem("pulse-deals-search",q);localStorage.setItem("pulse-deals-stage",stg);localStorage.setItem("pulse-deals-prio",pr);localStorage.setItem("pulse-deals-close",cf);}catch(_){}
       {const dfEl=$("#dfrom"),dtEl=$("#dto");if(dfEl)state._dDateFrom=dfEl.value;if(dtEl)state._dDateTo=dtEl.value;try{localStorage.setItem("pulse-deals-datefrom",state._dDateFrom);localStorage.setItem("pulse-deals-dateto",state._dDateTo);}catch(_){}}
       const _now=Date.now();
@@ -2006,6 +1991,10 @@ function renderDeals(c){
         if(q&&!(d.name.toLowerCase().includes(q)||co.toLowerCase().includes(q)||(d.owner||"").toLowerCase().includes(q)))return false;
         if(stg&&d.stage!==stg)return false;
         if(pr&&(d.priority||"low")!==pr)return false;
+        if(dcf.name&&!d.name.toLowerCase().includes(dcf.name.toLowerCase()))return false;
+        if(dcf.company&&!co.toLowerCase().includes(dcf.company.toLowerCase()))return false;
+        if(dcf.owner&&!(d.owner||"").toLowerCase().includes(dcf.owner.toLowerCase()))return false;
+        if(dcf.createdBy&&!(d.createdBy||"").toLowerCase().includes(dcf.createdBy.toLowerCase()))return false;
         if(cf==="overdue"){if(!d.expectedClose||d.expectedClose>=_now||d.stage==="Won"||d.stage==="Lost")return false;}
         else if(cf==="week"){if(!d.expectedClose||d.expectedClose<_sow||d.expectedClose>=_eow)return false;}
         else if(cf==="month"){if(!d.expectedClose||d.expectedClose<_som.getTime()||d.expectedClose>=_eom)return false;}
@@ -2033,14 +2022,14 @@ function renderDeals(c){
       const setSort=col=>{if(state._dSort.col===col)state._dSort.dir=state._dSort.dir==="asc"?"desc":"asc";else{state._dSort.col=col;state._dSort.dir="asc";}draw();};
       const cdOpts=`<option value="">All close dates</option><option value="overdue"${cf==="overdue"?" selected":""}>Overdue</option><option value="week"${cf==="week"?" selected":""}>This week</option><option value="month"${cf==="month"?" selected":""}>This month</option><option value="q"${cf==="q"?" selected":""}>This quarter</option><option value="30"${cf==="30"?" selected":""}>Next 30 days</option><option value="set"${cf==="set"?" selected":""}>Has close date</option><option value="none"${cf==="none"?" selected":""}>No close date</option><option value="custom"${cf==="custom"?" selected":""}>Custom range…</option>`;
       $("#dtable").innerHTML=rows.length?`<table><thead><tr>
-          <th class="${thCls("name")}" data-sort="name">Deal${SI()}</th>
-          <th class="${thCls("company")}" data-sort="company">Company${SI()}</th>
+          <th class="${thCls("name")}" data-sort="name">Deal${SI()}<input class="th-fi" id="dcf-name" placeholder="Filter deal…" value="${esc(dcf.name||"")}"></th>
+          <th class="${thCls("company")}" data-sort="company">Company${SI()}<input class="th-fi" id="dcf-co" placeholder="Filter company…" value="${esc(dcf.company||"")}"></th>
           <th class="${thCls("stage")}" data-sort="stage">Stage${SI()}<select class="th-fi" id="dstage"><option value="">All stages</option>${stageList().map(s=>`<option value="${esc(s)}"${stg===s?" selected":""}>${esc(s)}</option>`).join("")}</select></th>
           <th class="${thCls("value")}" data-sort="value">Value${SI()}</th>
           <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}<select class="th-fi" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${pr===p?" selected":""}>${esc(p)}</option>`).join("")}</select></th>
           <th class="${thCls("expectedClose")}" data-sort="expectedClose">Close date${SI()}<select class="th-fi" id="dclosedate">${cdOpts}</select></th>
-          <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}</th>
-          <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}</th>
+          <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="dcf-owner" placeholder="Filter owner…" value="${esc(dcf.owner||"")}"></th>
+          <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="dcf-crby" placeholder="Filter creator…" value="${esc(dcf.createdBy||"")}"></th>
           <th></th></tr></thead><tbody>
           ${rows.map(d=>`<tr data-id="${d.id}">
             <td><div style="font-weight:600;font-size:13px">${esc(d.name)}</div></td>
@@ -2062,6 +2051,11 @@ function renderDeals(c){
       if(stgEl){stgEl.onchange=e=>{state._dStageF=e.target.value;draw();};stgEl.onclick=e=>e.stopPropagation();}
       if(prEl){prEl.onchange=e=>{state._dPrioF=e.target.value;draw();};prEl.onclick=e=>e.stopPropagation();}
       if(cfEl){cfEl.onchange=e=>{state._dCloseF=e.target.value;const drEl=$("#daterange-row");if(drEl)drEl.style.display=e.target.value==="custom"?"flex":"none";if(e.target.value!=="custom"){state._dDateFrom="";state._dDateTo="";}draw();};cfEl.onclick=e=>e.stopPropagation();}
+      const dcfNameEl=$("#dcf-name"),dcfCoEl=$("#dcf-co"),dcfOwEl=$("#dcf-owner"),dcfCrByEl=$("#dcf-crby");
+      if(dcfNameEl){dcfNameEl.oninput=e=>{state._dColF.name=e.target.value;draw();};dcfNameEl.onclick=e=>e.stopPropagation();}
+      if(dcfCoEl){dcfCoEl.oninput=e=>{state._dColF.company=e.target.value;draw();};dcfCoEl.onclick=e=>e.stopPropagation();}
+      if(dcfOwEl){dcfOwEl.oninput=e=>{state._dColF.owner=e.target.value;draw();};dcfOwEl.onclick=e=>e.stopPropagation();}
+      if(dcfCrByEl){dcfCrByEl.oninput=e=>{state._dColF.createdBy=e.target.value;draw();};dcfCrByEl.onclick=e=>e.stopPropagation();}
     };
     const srEl=$("#dsearch");if(srEl)srEl.oninput=draw;
     const dfEl=$("#dfrom"),dtEl=$("#dto");if(dfEl)dfEl.onchange=draw;if(dtEl)dtEl.onchange=draw;
@@ -2152,6 +2146,8 @@ function renderTasks(c){
       else if(f==="done"&&t.status!=="done")return false;
       if(cf.priority&&(t.priority||"low")!==cf.priority)return false;
       if(cf.owner&&!(t.owner||"").toLowerCase().includes(cf.owner.toLowerCase()))return false;
+      if(cf.title&&!(t.title||"").toLowerCase().includes(cf.title.toLowerCase()))return false;
+      if(cf.createdBy&&!(t.createdBy||"").toLowerCase().includes(cf.createdBy.toLowerCase()))return false;
       return true;
     });
     const sc=state._tSort.col,sd=state._tSort.dir;
@@ -2168,11 +2164,11 @@ function renderTasks(c){
     $("#ttable").innerHTML=rows.length?`<table><thead>
       <tr>
         <th style="width:40px"></th>
-        <th class="${thCls("title")}" data-sort="title">Task${SI()}</th>
+        <th class="${thCls("title")}" data-sort="title">Task${SI()}<input class="th-fi" id="cf-ttitle" placeholder="Filter task…" value="${esc(cf.title||"")}"></th>
         <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}<select class="th-fi" id="cf-tprio"><option value="">All priorities</option>${["high","medium","low"].map(p=>`<option value="${p}"${cf.priority===p?" selected":""}>${p}</option>`).join("")}</select></th>
         <th class="${thCls("due")}" data-sort="due">Due date${SI()}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-towner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
-        <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}</th>
+        <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-tcrby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
         <th></th>
       </tr>
       </thead><tbody>
@@ -2186,9 +2182,11 @@ function renderTasks(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${t.id}">${I.edit}</button></div></td></tr>`;}).join("")}
       </tbody></table>`:emptyState("check","Nothing here","You're all caught up for this view.","New task","newt2");
     $("#ttable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>setSort(th.dataset.sort));
-    const cfPr=$("#cf-tprio"),cfOw=$("#cf-towner");
+    const cfPr=$("#cf-tprio"),cfOw=$("#cf-towner"),cfTi=$("#cf-ttitle"),cfCrBy=$("#cf-tcrby");
     if(cfPr){cfPr.onchange=e=>{state._tColF.priority=e.target.value;draw();};cfPr.onclick=e=>e.stopPropagation();}
     if(cfOw){cfOw.oninput=e=>{state._tColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
+    if(cfTi){cfTi.oninput=e=>{state._tColF.title=e.target.value;draw();};cfTi.onclick=e=>e.stopPropagation();}
+    if(cfCrBy){cfCrBy.oninput=e=>{state._tColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
     $("#ttable").querySelectorAll("[data-done]").forEach(cb=>cb.onclick=e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===cb.dataset.done);
       dbUpdate("tasks",cb.dataset.done,{status:cb.checked?"done":"open"},true); if(cb.checked)logActivity("task",`Completed task "${t?.title||""}"`,t?.relatedType,t?.relatedId); draw();});
     $("#ttable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();taskForm(b.dataset.edit);});
@@ -2237,6 +2235,9 @@ function renderTickets(c){
       if(st&&x.status!==st)return false;
       if(pr&&(x.priority||"")!==pr)return false;
       if(ty&&(x.type||"")!==ty)return false;
+      if(state._tkColF.company&&!co.toLowerCase().includes(state._tkColF.company.toLowerCase()))return false;
+      if(state._tkColF.contact&&!ct.toLowerCase().includes(state._tkColF.contact.toLowerCase()))return false;
+      if(state._tkColF.owner&&!(x.owner||"").toLowerCase().includes(state._tkColF.owner.toLowerCase()))return false;
       return true;
     });
     const sc=state._tkSort.col,sd=state._tkSort.dir;
@@ -2276,9 +2277,9 @@ function renderTickets(c){
         <th class="${thCls("status")}" data-sort="status">Status${SI()}<select class="th-fi" id="tkstatus">${tkStOpts}</select></th>
         <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}<select class="th-fi" id="tkprio">${tkPrOpts}</select></th>
         <th>SLA</th>
-        <th class="${thCls("company")}" data-sort="company">Company${SI()}</th>
-        <th>Contact</th>
-        <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}</th>
+        <th class="${thCls("company")}" data-sort="company">Company${SI()}<input class="th-fi" id="tk-co" placeholder="Filter company…" value="${esc(state._tkColF.company||"")}"></th>
+        <th>Contact<input class="th-fi" id="tk-ct" placeholder="Filter contact…" value="${esc(state._tkColF.contact||"")}"></th>
+        <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="tk-owner" placeholder="Filter owner…" value="${esc(state._tkColF.owner||"")}"></th>
         <th class="${thCls("createdAt")}" data-sort="createdAt">Created${SI()}</th>
         <th></th>
       </tr></thead><tbody>${tbody}</tbody></table>`:emptyState("ticket","No tickets yet","Create your first support ticket to start tracking customer issues.","New ticket","newtk2");
@@ -2290,6 +2291,10 @@ function renderTickets(c){
     if(tkStEl){tkStEl.onchange=e=>{state._tkColF.status=e.target.value;draw();};tkStEl.onclick=e=>e.stopPropagation();}
     if(tkPrEl){tkPrEl.onchange=e=>{state._tkColF.priority=e.target.value;draw();};tkPrEl.onclick=e=>e.stopPropagation();}
     if(tkTyEl){tkTyEl.onchange=e=>{state._tkColF.type=e.target.value;draw();};tkTyEl.onclick=e=>e.stopPropagation();}
+    const tkCoEl=$("#tk-co"),tkCtEl=$("#tk-ct"),tkOwEl=$("#tk-owner");
+    if(tkCoEl){tkCoEl.oninput=e=>{state._tkColF.company=e.target.value;draw();};tkCoEl.onclick=e=>e.stopPropagation();}
+    if(tkCtEl){tkCtEl.oninput=e=>{state._tkColF.contact=e.target.value;draw();};tkCtEl.onclick=e=>e.stopPropagation();}
+    if(tkOwEl){tkOwEl.oninput=e=>{state._tkColF.owner=e.target.value;draw();};tkOwEl.onclick=e=>e.stopPropagation();}
   };
   const tkSrEl=$("#tksearch");if(tkSrEl)tkSrEl.oninput=draw;
   $("#newtk").onclick=()=>ticketForm();draw();
