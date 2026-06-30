@@ -243,6 +243,8 @@
   .scrim.show{opacity:1;pointer-events:auto;}
   .drawer{position:fixed;top:0;right:0;height:100vh;width:min(520px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);z-index:61;transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
   .drawer.show{transform:none;}
+  .drawer-resize{position:absolute;top:0;left:0;width:5px;height:100%;cursor:col-resize;z-index:10;background:transparent;transition:background .15s;}
+  .drawer-resize:hover,.drawer-resize.dragging{background:var(--accent);opacity:.35;}
   .drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 22px;border-bottom:1px solid var(--line);}
   .drawer-head h2{font-size:17px;font-weight:600;}
   .drawer-body{padding:20px 22px;overflow-y:auto;flex:1;}
@@ -668,7 +670,7 @@ const state={ page:"dashboard", detail:null, user:null,
   _cSort:{col:"",dir:"asc"}, _cColF:{status:"",owner:""},
   _coSort:{col:"",dir:"asc"}, _coColF:{industry:"",owner:""}, _coTab:"all",
   _tSort:{col:"due",dir:"asc"}, _tColF:{priority:""},
-  _dSort:{col:"",dir:"asc"}, _dView:"", _pipeView:"bars",
+  _dSort:{col:"",dir:"asc"}, _dView:"", _pipeView:"bars", _dCloseF:"",
   _tkSort:{col:"createdAt",dir:"desc"}, _tkColF:{status:"",priority:""}, _tkSearch:"",
   _tmplSearch:"", _tmplCat:"",
   _dashTf: localStorage.getItem("pulse-dash-tf")||"30d",
@@ -1519,8 +1521,8 @@ function renderDashboard(c){
   c.querySelectorAll("[data-dash-nav]").forEach(el=>{
     el.onclick=()=>{
       const nav=el.dataset.dashNav;
-      if(nav==="deals-won"){state.page="deals";state._dView="list";state._dStageF="Won";state._dPrioF="";}
-      else if(nav==="deals-open"){state.page="deals";state._dView=state._dView||"board";state._dStageF="";state._dPrioF="";}
+      if(nav==="deals-won"){state.page="deals";state._dView="list";state._dStageF="Won";state._dPrioF="";state._dCloseF="";}
+      else if(nav==="deals-open"){state.page="deals";state._dView=state._dView||"board";state._dStageF="";state._dPrioF="";state._dCloseF="";}
       else if(nav==="contacts"){state.page="contacts";}
       else if(nav==="tasks-today"){state.page="tasks";state._tf="today";}
       state.detail=null;render();
@@ -1850,9 +1852,11 @@ function renderDeals(c){
     ${isList
       ?`<div class="toolbar"><div class="field-search">${I.search}<input id="dsearch" placeholder="Search deals, companies, owners…" value="${esc(state._dSearch||"")}"></div>
           <select class="input" id="dstage"><option value="">All stages</option>${STAGES.map(s=>`<option value="${esc(s)}"${(state._dStageF||"")=== s?" selected":""}>${esc(s)}</option>`).join("")}</select>
-          <select class="input" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${(state._dPrioF||"")=== p?" selected":""}>${esc(p)}</option>`).join("")}</select></div>
+          <select class="input" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${(state._dPrioF||"")=== p?" selected":""}>${esc(p)}</option>`).join("")}</select>
+          <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
          <div class="card tablecard" id="dtable"></div>`
-      :`<div class="board${ori==="v"?" vert":""}" id="board"></div>`}`;
+      :`<div class="toolbar"><select class="input" id="bclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
+          <div class="board${ori==="v"?" vert":""}" id="board"></div>`}`;
   const setView=(v,o)=>{state._dView=v;if(o)state._pipeOri=o;try{localStorage.setItem("pulse-deals-view",v);if(o)localStorage.setItem("pulse-pipe-ori",o);}catch(_){}renderDeals(c);};
   $("#newd").onclick=()=>dealForm();
   $("#ori-h").onclick=()=>setView("board","h");
@@ -1862,13 +1866,26 @@ function renderDeals(c){
     const SI=()=>`<span class="sort-ind"></span>`;
     const thCls=col=>"sortable"+(state._dSort.col===col?" sorted-"+state._dSort.dir:"");
     const draw=()=>{
-      const q=($("#dsearch").value||"").toLowerCase(),stg=$("#dstage").value,pr=$("#dprio").value;
-      state._dSearch=q;state._dStageF=stg;state._dPrioF=pr;
+      const q=($("#dsearch").value||"").toLowerCase(),stg=$("#dstage").value,pr=$("#dprio").value,cf=$("#dclosedate").value;
+      state._dSearch=q;state._dStageF=stg;state._dPrioF=pr;state._dCloseF=cf;
+      const _now=Date.now();
+      const _sow=_now-new Date().getDay()*864e5;const _eow=_sow+7*864e5;
+      const _som=new Date();_som.setDate(1);_som.setHours(0,0,0,0);
+      const _eom=new Date(_som.getFullYear(),_som.getMonth()+1,1).getTime();
+      const _soq=new Date();const _qm=Math.floor(_soq.getMonth()/3)*3;_soq.setMonth(_qm,1);_soq.setHours(0,0,0,0);
+      const _eoq=new Date(_soq.getFullYear(),_qm+3,1).getTime();
       let rows=D.filter(d=>{
         const co=companyById(d.companyId)?.name||"";
         if(q&&!(d.name.toLowerCase().includes(q)||co.toLowerCase().includes(q)||(d.owner||"").toLowerCase().includes(q)))return false;
         if(stg&&d.stage!==stg)return false;
         if(pr&&(d.priority||"low")!==pr)return false;
+        if(cf==="overdue"){if(!d.expectedClose||d.expectedClose>=_now||d.stage==="Won"||d.stage==="Lost")return false;}
+        else if(cf==="week"){if(!d.expectedClose||d.expectedClose<_sow||d.expectedClose>=_eow)return false;}
+        else if(cf==="month"){if(!d.expectedClose||d.expectedClose<_som.getTime()||d.expectedClose>=_eom)return false;}
+        else if(cf==="q"){if(!d.expectedClose||d.expectedClose<_soq.getTime()||d.expectedClose>=_eoq)return false;}
+        else if(cf==="30"){if(!d.expectedClose||d.expectedClose<_now||d.expectedClose>=_now+30*864e5)return false;}
+        else if(cf==="set"){if(!d.expectedClose)return false;}
+        else if(cf==="none"){if(d.expectedClose)return false;}
         return true;
       });
       const sc=state._dSort.col,sd=state._dSort.dir;
@@ -1913,11 +1930,31 @@ function renderDeals(c){
       $("#dtable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();dealForm(b.dataset.edit);});
       const n2=$("#newd2");if(n2)n2.onclick=()=>dealForm();
     };
-    $("#dsearch").oninput=draw;$("#dstage").onchange=draw;$("#dprio").onchange=draw;draw();
+    $("#dsearch").oninput=draw;$("#dstage").onchange=draw;$("#dprio").onchange=draw;$("#dclosedate").onchange=draw;draw();
   } else {
+    const bCloseEl=$("#bclosedate");
+    if(bCloseEl)bCloseEl.onchange=()=>{state._dCloseF=bCloseEl.value;renderDeals(c);};
+    const cf=state._dCloseF||"";
+    const _now=Date.now();
+    const _sow=_now-new Date().getDay()*864e5;const _eow=_sow+7*864e5;
+    const _som=new Date();_som.setDate(1);_som.setHours(0,0,0,0);
+    const _eom=new Date(_som.getFullYear(),_som.getMonth()+1,1).getTime();
+    const _soq=new Date();const _qm=Math.floor(_soq.getMonth()/3)*3;_soq.setMonth(_qm,1);_soq.setHours(0,0,0,0);
+    const _eoq=new Date(_soq.getFullYear(),_qm+3,1).getTime();
+    const filterDeal=d=>{
+      const dt=d.expectedClose||d.renewalDate||null;
+      if(cf==="overdue"){if(!dt||dt>=_now||d.stage==="Won"||d.stage==="Lost")return false;}
+      else if(cf==="week"){if(!dt||dt<_sow||dt>=_eow)return false;}
+      else if(cf==="month"){if(!dt||dt<_som.getTime()||dt>=_eom)return false;}
+      else if(cf==="q"){if(!dt||dt<_soq.getTime()||dt>=_eoq)return false;}
+      else if(cf==="30"){if(!dt||dt<_now||dt>=_now+30*864e5)return false;}
+      else if(cf==="set"){if(!dt)return false;}
+      else if(cf==="none"){if(dt)return false;}
+      return true;
+    };
     const board=$("#board");
     board.innerHTML=STAGES.map(s=>{
-      const items=D.filter(d=>d.stage===s).sort((a,b)=>(a.order||0)-(b.order||0));
+      const items=D.filter(d=>d.stage===s&&filterDeal(d)).sort((a,b)=>(a.order||0)-(b.order||0));
       const tot=items.reduce((a,d)=>a+(+d.value||0),0);
       return `<div class="kcol" data-stage="${esc(s)}">
         <div class="kcol-head"><span class="dot" style="background:${STAGE_COLOR[s]}"></span><span class="nm">${s}</span><span class="ct">${items.length}</span><span class="tot">${moneyK(tot)}</span></div>
@@ -2363,7 +2400,9 @@ function renderAnalytics(c){
     </div>
     <div class="card panel" style="margin-top:14px"><div class="panel-head"><h2>Rep performance</h2></div>
       ${repRows.length?`<table><thead><tr><th>Rep</th><th>Deals won</th><th>Revenue</th></tr></thead><tbody>
-        ${repRows.map(([o,r])=>`<tr style="cursor:default"><td><div class="cellname">${ava(o,26)}${esc(o)}</div></td><td>${r.won}</td><td style="font-weight:600">${money(r.val)}</td></tr>`).join("")}</tbody></table>`:emptyMini("No closed deals yet","Win some deals to see rep performance.")}</div>`;
+        ${repRows.map(([o,r])=>`<tr style="cursor:default"><td><div class="cellname">${ava(o,26)}${esc(o)}</div></td><td>${r.won}</td><td style="font-weight:600">${money(r.val)}</td></tr>`).join("")}</tbody></table>`:emptyMini("No closed deals yet","Win some deals to see rep performance.")}</div>
+    <div class="card panel" style="margin-top:14px"><div class="panel-head"><h2>Pipeline by close date</h2></div>
+      ${(()=>{const _an=Date.now();const open=D.filter(d=>d.stage!=="Won"&&d.stage!=="Lost");const overdue=open.filter(d=>d.expectedClose&&d.expectedClose<_an);const thisMonth=open.filter(d=>d.expectedClose&&d.expectedClose>=_an&&d.expectedClose<new Date(new Date().getFullYear(),new Date().getMonth()+1,1).getTime());const next30=open.filter(d=>d.expectedClose&&d.expectedClose>=_an&&d.expectedClose<_an+30*864e5);const noDate=open.filter(d=>!d.expectedClose);const rows2=[{l:"Overdue",items:overdue,col:"var(--danger)"},{l:"Closing this month",items:thisMonth,col:"var(--accent)"},{l:"Next 30 days",items:next30,col:"var(--accent-2)"},{l:"No close date set",items:noDate,col:"var(--muted)"}];return rows2.map(r=>`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:13px;font-weight:500;color:${r.col}">${esc(r.l)}</span><span style="font-size:12px;color:var(--muted)">${r.items.length} deal${r.items.length!==1?"s":""} &middot; ${moneyK(r.items.reduce((s,d)=>s+(+d.value||0),0))}</span></div>${r.items.length?`<div style="display:flex;flex-wrap:wrap;gap:5px">${r.items.slice(0,6).map(d=>`<span class="chip" title="${esc(d.name)} — ${money(d.value)}">${esc(d.name.length>22?d.name.slice(0,22)+"…":d.name)}</span>`).join("")}${r.items.length>6?`<span class="chip muted">+${r.items.length-6} more</span>`:""}</div>`:""}`).join("")})()}</div>`;
 }
 
 /* ---------------- Settings ---------------- */
@@ -2843,7 +2882,9 @@ function emptyState(icon,title,sub,btn,btnId){
 ==================================================================== */
 function openDrawer(title,bodyHtml,onSave,saveLabel){
   const d=$("#drawer");
-  d.innerHTML=`<div class="drawer-head"><h2>${esc(title)}</h2><button class="iconbtn" id="dclose">${I.x}</button></div>
+  const _dW=parseInt(localStorage.getItem("pulse_drawer_w"));
+  if(_dW>=420&&_dW<=900)d.style.width=_dW+"px"; else d.style.width="";
+  d.innerHTML=`<div class="drawer-resize" id="drawer-resize"></div><div class="drawer-head"><h2>${esc(title)}</h2><button class="iconbtn" id="dclose">${I.x}</button></div>
     <div class="drawer-body">${bodyHtml}</div>
     <div class="drawer-foot"><button class="btn" id="dcancel">Cancel</button><button class="btn primary" id="dsave">${esc(saveLabel||"Save")}</button></div>`;
   $("#scrim").classList.add("show");d.classList.add("show");
@@ -2851,6 +2892,34 @@ function openDrawer(title,bodyHtml,onSave,saveLabel){
   $("#dclose").onclick=close;$("#dcancel").onclick=close;
   $("#dsave").onclick=async()=>{ const ok=await onSave(); if(ok!==false)close(); };
   const first=d.querySelector("input,select,textarea");if(first)setTimeout(()=>first.focus(),120);
+  initDrawerResize();
+}
+function initDrawerResize(){
+  const handle=$("#drawer-resize");const drawer=$("#drawer");if(!handle||!drawer)return;
+  const DW_MIN=420,DW_MAX=900;
+  let startX,startW;
+  handle.onmousedown=e=>{
+    e.preventDefault();
+    startX=e.clientX;
+    startW=drawer.offsetWidth;
+    handle.classList.add("dragging");
+    document.body.style.cursor="col-resize";
+    document.body.style.userSelect="none";
+    function onMove(ev){
+      const w=Math.min(DW_MAX,Math.max(DW_MIN,startW+(startX-ev.clientX)));
+      drawer.style.width=w+"px";
+    }
+    function onUp(){
+      handle.classList.remove("dragging");
+      document.body.style.cursor="";
+      document.body.style.userSelect="";
+      try{localStorage.setItem("pulse_drawer_w",drawer.offsetWidth);}catch(_){}
+      document.removeEventListener("mousemove",onMove);
+      document.removeEventListener("mouseup",onUp);
+    }
+    document.addEventListener("mousemove",onMove);
+    document.addEventListener("mouseup",onUp);
+  };
 }
 function closeDrawer(){const d=$("#drawer");d.classList.remove("show");if(!$("#aipanel")?.classList.contains("show"))$("#scrim").classList.remove("show");}
 const val=id=>{const e=document.getElementById(id);return e?e.value.trim():"";};
@@ -3206,9 +3275,10 @@ function quoteBuilderModal(prefill){
   overlay.onclick=e=>{if(e.target===overlay)close();};
 
   const coOpts=[{v:"",l:"— No company —"},...live(state.companies).map(co=>({v:co.id,l:co.name}))];
-  const ctOpts=[{v:"",l:"— No contact —"},...live(state.contacts).map(ct=>({v:ct.id,l:contactName(ct)}))];
   const preCo=prefill?.companyId||"";const preName=prefill?.name||"";
   const opt=(o,cur)=>`<option value="${esc(o.v)}" ${o.v===cur?"selected":""}>${esc(o.l)}</option>`;
+  const ctOptsFor=coId=>[{v:"",l:"— No contact —"},...live(state.contacts).filter(ct=>!coId||ct.companyId===coId).map(ct=>({v:ct.id,l:contactName(ct)}))];
+  const preCt=prefill?.contactId||"";
 
   const intCards=settings.integrations.map(it=>`
     <div class="qb-card" data-int-id="${esc(it.id)}">
@@ -3241,7 +3311,7 @@ function quoteBuilderModal(prefill){
             <div class="field" style="margin-bottom:10px"><label>Quote name</label><input id="qb-qname" placeholder="e.g. Acme — 2026 Platform Quote" value="${esc(preName)}"></div>
             <div class="field" style="margin-bottom:10px"><label>Company</label><select id="qb-company">${coOpts.map(o=>opt(o,preCo)).join("")}</select></div>
           </div>
-          <div class="field" style="margin-bottom:0"><label>Contact (optional)</label><select id="qb-contact">${ctOpts.map(o=>opt(o,prefill?.contactId||"")).join("")}</select></div>
+          <div class="field" style="margin-bottom:0"><label>Contact (optional)</label><select id="qb-contact">${ctOptsFor(preCo).map(o=>opt(o,preCt)).join("")}</select></div>
         </div>
         <div class="qb-section">
           <div class="qb-h">1 · Integrations <span class="qb-h-sub">click to select · use ＋ / − for multiple accounts</span></div>
@@ -3338,6 +3408,24 @@ function quoteBuilderModal(prefill){
   ["qb-users","qb-price","qb-data"].forEach(id=>{const e=overlay.querySelector("#"+id);if(e)e.oninput=paint;});
   overlay.querySelector("#qb-mult").onchange=paint;
   overlay.querySelector("#qb-bundle").oninput=()=>{bundleTouched=true;paint();};
+  // Bidirectional company ↔ contact linking
+  const coSel=overlay.querySelector("#qb-company");
+  const ctSel=overlay.querySelector("#qb-contact");
+  coSel.onchange=()=>{
+    const coId=coSel.value;
+    const curCt=ctSel.value;
+    const opts=ctOptsFor(coId);
+    const keepCt=opts.some(o=>o.v===curCt)?curCt:"";
+    ctSel.innerHTML=opts.map(o=>opt(o,keepCt)).join("");
+  };
+  ctSel.onchange=()=>{
+    const ct=contactById(ctSel.value);
+    if(ct?.companyId){
+      coSel.value=ct.companyId;
+      const opts=ctOptsFor(ct.companyId);
+      ctSel.innerHTML=opts.map(o=>opt(o,ctSel.value)).join("");
+    }
+  };
   overlay.querySelector("#qbX").onclick=close;
   overlay.querySelector("#qbCancel").onclick=close;
   overlay.querySelector("#qbSave").onclick=async()=>{
