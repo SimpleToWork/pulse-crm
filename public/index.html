@@ -194,10 +194,24 @@
   thead th .th-fi:focus{border-color:var(--accent);}
   thead th .th-fi::placeholder{color:var(--faint);}
   thead th select.th-fi{cursor:pointer;}
-  thead th:has(.th-fi){vertical-align:top;white-space:normal;}
+  thead th:has(.th-fi),thead th:has(.sdd){vertical-align:top;white-space:normal;}
+  thead th:has(.sdd){position:relative;}
+  .sdd{display:block;width:100%;margin-top:5px;font-weight:400;text-transform:none;letter-spacing:0;}
+  .sdd-val{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:3px 20px 3px 6px;font-size:11px;color:var(--ink);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:border-color .13s;position:relative;user-select:none;}
+  .sdd-val::after{content:"▾";position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:.5;font-size:9px;pointer-events:none;}
+  .sdd.open .sdd-val{border-color:var(--accent);}
+  .sdd-panel{display:none;position:absolute;top:calc(100% + 3px);left:0;min-width:140px;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow-lg);z-index:200;padding:5px;}
+  .sdd.open .sdd-panel{display:block;}
+  .sdd-search{width:100%;border:1px solid var(--line);border-radius:4px;padding:4px 7px;font-size:11px;background:var(--surface-2);color:var(--ink);outline:none;margin-bottom:3px;box-sizing:border-box;}
+  .sdd-search:focus{border-color:var(--accent);}
+  .sdd-opts{max-height:140px;overflow-y:auto;}
+  .sdd-opt{padding:4px 8px;font-size:11.5px;border-radius:4px;cursor:pointer;white-space:nowrap;}
+  .sdd-opt:hover{background:var(--surface-2);}
+  .sdd-opt.sel{background:var(--accent-soft);color:var(--accent-ink);}
+  .sdd-opt.hidden{display:none;}
 
   /* ---------- kanban ---------- */
-  .board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(248px,1fr);gap:13px;overflow-x:auto;padding-bottom:8px;align-items:start;}
+  .board{display:grid;grid-auto-flow:column;grid-auto-columns:280px;gap:13px;overflow-x:auto;padding-bottom:12px;align-items:start;scrollbar-width:thin;}
   .kcol{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:9px;min-height:120px;transition:background .12s,outline .12s;}
   .kcol.dragover{outline:2px dashed var(--accent);outline-offset:-3px;background:var(--accent-soft);}
   .kcol-head{display:flex;align-items:center;gap:8px;padding:2px 4px;}
@@ -220,11 +234,13 @@
   .od-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:7px;cursor:pointer;transition:background .15s;}
   .od-row:hover{background:var(--surface-2);}
   /* vertical kanban */
-  .board.vert{display:flex;flex-direction:column;overflow-x:visible;padding-bottom:0;}
-  .board.vert .kcol{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;min-height:auto;gap:9px;overflow-x:auto;}
+  .board.vert{display:flex;flex-direction:column;overflow-x:hidden;padding-bottom:0;width:100%;}
+  .board.vert .kcol{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;min-height:auto;gap:9px;overflow-x:auto;min-width:0;}
   .board.vert .kcol-head{flex:none;width:132px;min-width:132px;flex-direction:column;align-items:flex-start;gap:4px;padding:4px 10px 4px 4px;border-right:2px solid var(--line);align-self:stretch;}
   .board.vert .kcol-head .tot{margin-left:0;}
   .board.vert .dealcard{width:200px;flex:none;}
+  .dealcard mark{background:#fef08a;color:inherit;border-radius:2px;padding:0 1px;font-style:normal;}
+  .kcol-empty{text-align:center;padding:18px 8px;color:var(--muted);font-size:12px;}
 
   /* ---------- timeline ---------- */
   .timeline{display:flex;flex-direction:column;gap:2px;}
@@ -758,6 +774,20 @@ function timeAgo(t){ if(!t)return"";const s=(Date.now()-t)/1000;
 const dayStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();};
 const isToday=t=>t&&dayStart(t)===dayStart(Date.now());
 const isOverdue=t=>t&&dayStart(t)<dayStart(Date.now());
+function sdd(id,opts,val,placeholder){
+  const selOpt=opts.find(o=>o.value===(val||""));
+  const disp=selOpt?selOpt.label:placeholder;
+  return `<div class="sdd" id="${id}" data-val="${esc(val||'')}"><div class="sdd-val">${esc(disp)}</div><div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-opts">${opts.map(o=>`<div class="sdd-opt${o.value===(val||"")?" sel":""}" data-value="${esc(o.value)}">${esc(o.label)}</div>`).join("")}</div></div></div>`;
+}
+function wireSdd(id,onChange){
+  const el=document.getElementById(id);if(!el)return;
+  const valEl=el.querySelector(".sdd-val"),panel=el.querySelector(".sdd-panel"),search=el.querySelector(".sdd-search"),opts=el.querySelectorAll(".sdd-opt");
+  valEl.onclick=e=>{e.stopPropagation();const isOpen=el.classList.contains("open");document.querySelectorAll(".sdd.open").forEach(s=>s.classList.remove("open"));if(!isOpen){el.classList.add("open");search.value="";opts.forEach(o=>o.classList.remove("hidden"));setTimeout(()=>search.focus(),0);}};
+  panel.onclick=e=>e.stopPropagation();
+  search.oninput=()=>{const q=search.value.toLowerCase();opts.forEach(o=>o.classList.toggle("hidden",!!q&&!o.textContent.toLowerCase().includes(q)));};
+  search.onkeydown=e=>{if(e.key==="Escape")el.classList.remove("open");};
+  opts.forEach(o=>{o.onclick=e=>{e.stopPropagation();const v=o.dataset.value;opts.forEach(op=>op.classList.toggle("sel",op===o));valEl.textContent=o.textContent;el.dataset.val=v;el.classList.remove("open");onChange(v);};});
+}
 function tfStart(tf){
   const now=Date.now(), d=new Date(); d.setHours(0,0,0,0);
   if(tf==="7d")return now-7*864e5;
@@ -1704,7 +1734,7 @@ function renderContacts(c){
         <th class="${thCls("name")}" data-sort="name">Name${SI()}<input class="th-fi" id="cf-cname" placeholder="Filter name/email…" value="${esc(cf.nameEmail||"")}"></th>
         <th class="${thCls("company")}" data-sort="company">Company${SI()}<input class="th-fi" id="cf-cco" placeholder="Filter company…" value="${esc(cf.company||"")}"></th>
         <th class="${thCls("email")}" data-sort="email">Email${SI()}</th>
-        <th class="${thCls("status")}" data-sort="status">Status${SI()}<select class="th-fi" id="cf-cstatus"><option value="">All statuses</option>${["Lead","Qualified","Customer","Churned","Inactive"].map(s=>`<option value="${s}"${cf.status===s?" selected":""}>${s}</option>`).join("")}</select></th>
+        <th class="${thCls("status")}" data-sort="status">Status${SI()}${sdd("cf-cstatus",[{value:"",label:"All statuses"},...["Lead","Qualified","Customer","Churned","Inactive"].map(s=>({value:s,label:s}))],cf.status||"","All statuses")}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-cowner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
         <th class="${thCls("lastContacted")}" data-sort="lastContacted">Last contacted${SI()}</th>
         <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-ccrby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
@@ -1722,9 +1752,9 @@ function renderContacts(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td></tr>`).join("")}
       </tbody></table>`:emptyState("users","No contacts yet","Add your first contact to start building your pipeline.","New contact","newc2");
     $("#ctable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>setSort(th.dataset.sort));
-    const cfName=$("#cf-cname"),cfSt=$("#cf-cstatus"),cfOw=$("#cf-cowner"),cfCo=$("#cf-cco"),cfCrBy=$("#cf-ccrby");
+    const cfName=$("#cf-cname"),cfOw=$("#cf-cowner"),cfCo=$("#cf-cco"),cfCrBy=$("#cf-ccrby");
     if(cfName){cfName.oninput=e=>{state._cColF.nameEmail=e.target.value;draw();};cfName.onclick=e=>e.stopPropagation();}
-    if(cfSt){cfSt.onchange=e=>{state._cColF.status=e.target.value;draw();};cfSt.onclick=e=>e.stopPropagation();}
+    wireSdd("cf-cstatus",v=>{state._cColF.status=v;draw();});
     if(cfOw){cfOw.oninput=e=>{state._cColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
     if(cfCo){cfCo.oninput=e=>{state._cColF.company=e.target.value;draw();};cfCo.onclick=e=>e.stopPropagation();}
     if(cfCrBy){cfCrBy.oninput=e=>{state._cColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
@@ -1833,7 +1863,7 @@ function renderCompanies(c){
         <th class="${thCls("name")}" data-sort="name">Company${SI()}<input class="th-fi" id="cf-coname" placeholder="Filter company…" value="${esc(cf.name||"")}"></th>
         <th class="${thCls("industry")}" data-sort="industry">Industry${SI()}<input class="th-fi" id="cf-coind" placeholder="Filter industry…" value="${esc(cf.industry||"")}"></th>
         <th class="${thCls("size")}" data-sort="size">Size${SI()}<input class="th-fi" id="cf-cosize" placeholder="Filter size…" value="${esc(cf.size||"")}"></th>
-        <th class="${thCls("contacts")}" data-sort="contacts">Contacts${SI()}<select class="th-fi" id="cf-cocts"><option value="">Any</option><option value="1"${cf.minContacts==="1"?" selected":""}>Has contacts</option><option value="2"${cf.minContacts==="2"?" selected":""}>2+</option><option value="5"${cf.minContacts==="5"?" selected":""}>5+</option></select></th>
+        <th class="${thCls("contacts")}" data-sort="contacts">Contacts${SI()}${sdd("cf-cocts",[{value:"",label:"Any"},{value:"1",label:"Has contacts"},{value:"2",label:"2+"},{value:"5",label:"5+"}],cf.minContacts||"","Any")}</th>
         <th class="${thCls("openDeals")}" data-sort="openDeals">Open deals${SI()}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-coowner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
         <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-cocreatedby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
@@ -1848,11 +1878,11 @@ function renderCompanies(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td></tr>`;}).join("")}
       </tbody></table>`:emptyState("building","No companies yet","Add companies to group contacts and deals.","New company","newco2");
     $("#cotable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>setSort(th.dataset.sort));
-    const cfName=$("#cf-coname"),cfInd=$("#cf-coind"),cfSz=$("#cf-cosize"),cfCts=$("#cf-cocts"),cfOw=$("#cf-coowner"),cfCrBy=$("#cf-cocreatedby");
+    const cfName=$("#cf-coname"),cfInd=$("#cf-coind"),cfSz=$("#cf-cosize"),cfOw=$("#cf-coowner"),cfCrBy=$("#cf-cocreatedby");
     if(cfName){cfName.oninput=e=>{state._coColF.name=e.target.value;draw();};cfName.onclick=e=>e.stopPropagation();}
     if(cfInd){cfInd.oninput=e=>{state._coColF.industry=e.target.value;draw();};cfInd.onclick=e=>e.stopPropagation();}
     if(cfSz){cfSz.oninput=e=>{state._coColF.size=e.target.value;draw();};cfSz.onclick=e=>e.stopPropagation();}
-    if(cfCts){cfCts.onchange=e=>{state._coColF.minContacts=e.target.value;draw();};cfCts.onclick=e=>e.stopPropagation();}
+    wireSdd("cf-cocts",v=>{state._coColF.minContacts=v;draw();});
     if(cfOw){cfOw.oninput=e=>{state._coColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
     if(cfCrBy){cfCrBy.oninput=e=>{state._coColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
     $("#cotable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"company",id:tr.dataset.id};render();});
@@ -1937,22 +1967,8 @@ function renderDeals(c){
           <select class="input" id="dstage"><option value="">All stages</option>${stageList().map(s=>`<option value="${esc(s)}"${(state._dStageF||"")=== s?" selected":""}>${esc(s)}</option>`).join("")}</select>
           <select class="input" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${(state._dPrioF||"")=== p?" selected":""}>${esc(p)}</option>`).join("")}</select>
           <select class="input" id="dclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
-         <div id="daterange-row" style="display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap">
-           <span style="font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em">Close date range</span>
-           <input type="date" class="input" id="dfrom" value="${esc(state._dDateFrom||"")}" style="width:auto" title="From date">
-           <span style="font-size:13px;color:var(--muted)">to</span>
-           <input type="date" class="input" id="dto" value="${esc(state._dDateTo||"")}" style="width:auto" title="To date">
-           ${(state._dDateFrom||state._dDateTo)?`<button class="btn sm ghost" id="dcleardate">Clear</button>`:""}
-         </div>
          <div class="card tablecard" id="dtable"></div>`
       :`<div class="toolbar"><div class="field-search">${I.search}<input id="bsearch" placeholder="Search deals, companies, owners…" value="${esc(state._bSearch||"")}"></div><select class="input" id="bclosedate"><option value="">All close dates</option><option value="overdue"${state._dCloseF==="overdue"?" selected":""}>Overdue</option><option value="week"${state._dCloseF==="week"?" selected":""}>This week</option><option value="month"${state._dCloseF==="month"?" selected":""}>This month</option><option value="q"${state._dCloseF==="q"?" selected":""}>This quarter</option><option value="30"${state._dCloseF==="30"?" selected":""}>Next 30 days</option><option value="set"${state._dCloseF==="set"?" selected":""}>Has close date</option><option value="none"${state._dCloseF==="none"?" selected":""}>No close date</option></select></div>
-         <div id="bdaterange-row" style="display:flex;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap">
-           <span style="font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.03em">Close date range</span>
-           <input type="date" class="input" id="bdfrom" value="${esc(state._dDateFrom||"")}" style="width:auto" title="From date">
-           <span style="font-size:13px;color:var(--muted)">to</span>
-           <input type="date" class="input" id="bdto" value="${esc(state._dDateTo||"")}" style="width:auto" title="To date">
-           ${(state._dDateFrom||state._dDateTo)?`<button class="btn sm ghost" id="bdcleardate">Clear</button>`:""}
-         </div>
           <div class="board${ori==="v"?" vert":""}" id="board"></div>`}`;
   const setView=(v,o)=>{state._dView=v;if(o)state._pipeOri=o;try{localStorage.setItem("pulse-deals-view",v);if(o)localStorage.setItem("pulse-pipe-ori",o);}catch(_){}renderDeals(c);};
   c.querySelectorAll("[data-dealstf]").forEach(btn=>btn.onclick=()=>{
@@ -1976,7 +1992,6 @@ function renderDeals(c){
       const stg=state._dStageF||"",pr=state._dPrioF||"",cf=state._dCloseF||"";
       const dcf=state._dColF;
       try{localStorage.setItem("pulse-deals-search",q);localStorage.setItem("pulse-deals-stage",stg);localStorage.setItem("pulse-deals-prio",pr);localStorage.setItem("pulse-deals-close",cf);}catch(_){}
-      {const dfEl=$("#dfrom"),dtEl=$("#dto");if(dfEl)state._dDateFrom=dfEl.value;if(dtEl)state._dDateTo=dtEl.value;try{localStorage.setItem("pulse-deals-datefrom",state._dDateFrom);localStorage.setItem("pulse-deals-dateto",state._dDateTo);}catch(_){}}
       const _now=Date.now();
       const _sow=_now-new Date().getDay()*864e5;const _eow=_sow+7*864e5;
       const _som=new Date();_som.setDate(1);_som.setHours(0,0,0,0);
@@ -1999,7 +2014,6 @@ function renderDeals(c){
         else if(cf==="30"){if(!d.expectedClose||d.expectedClose<_now||d.expectedClose>=_now+30*864e5)return false;}
         else if(cf==="set"){if(!d.expectedClose)return false;}
         else if(cf==="none"){if(d.expectedClose)return false;}
-        if(state._dDateFrom||state._dDateTo){const from=state._dDateFrom?new Date(state._dDateFrom).getTime():0;const to=state._dDateTo?new Date(state._dDateTo).getTime()+864e5-1:Infinity;if(!d.expectedClose||d.expectedClose<from||d.expectedClose>to)return false;}
         return true;
       });
       const sc=state._dSort.col,sd=state._dSort.dir;
@@ -2013,20 +2027,22 @@ function renderDeals(c){
         else if(sc==="expectedClose"){av=a.expectedClose||0;bv=b.expectedClose||0;}
         else if(sc==="owner"){av=(a.owner||"").toLowerCase();bv=(b.owner||"").toLowerCase();}
         else if(sc==="createdBy"){av=(a.createdBy||"").toLowerCase();bv=(b.createdBy||"").toLowerCase();}
+        else if(sc==="createdAt"){av=a.createdAt||0;bv=b.createdAt||0;}
         else{av=a.updatedAt||0;bv=b.updatedAt||0;}
         return sd==="asc"?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
       });}else{rows.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));}
       const setSort=col=>{if(state._dSort.col===col)state._dSort.dir=state._dSort.dir==="asc"?"desc":"asc";else{state._dSort.col=col;state._dSort.dir="asc";}draw();};
-      const cdOpts=`<option value="">All close dates</option><option value="overdue"${cf==="overdue"?" selected":""}>Overdue</option><option value="week"${cf==="week"?" selected":""}>This week</option><option value="month"${cf==="month"?" selected":""}>This month</option><option value="q"${cf==="q"?" selected":""}>This quarter</option><option value="30"${cf==="30"?" selected":""}>Next 30 days</option><option value="set"${cf==="set"?" selected":""}>Has close date</option><option value="none"${cf==="none"?" selected":""}>No close date</option><option value="custom"${cf==="custom"?" selected":""}>Custom range…</option>`;
+      const cdOpts=`<option value="">All close dates</option><option value="overdue"${cf==="overdue"?" selected":""}>Overdue</option><option value="week"${cf==="week"?" selected":""}>This week</option><option value="month"${cf==="month"?" selected":""}>This month</option><option value="q"${cf==="q"?" selected":""}>This quarter</option><option value="30"${cf==="30"?" selected":""}>Next 30 days</option><option value="set"${cf==="set"?" selected":""}>Has close date</option><option value="none"${cf==="none"?" selected":""}>No close date</option>`;
       $("#dtable").innerHTML=rows.length?`<table><thead><tr>
           <th class="${thCls("name")}" data-sort="name">Deal${SI()}<input class="th-fi" id="dcf-name" placeholder="Filter deal…" value="${esc(dcf.name||"")}"></th>
           <th class="${thCls("company")}" data-sort="company">Company${SI()}<input class="th-fi" id="dcf-co" placeholder="Filter company…" value="${esc(dcf.company||"")}"></th>
-          <th class="${thCls("stage")}" data-sort="stage">Stage${SI()}<select class="th-fi" id="dstage"><option value="">All stages</option>${stageList().map(s=>`<option value="${esc(s)}"${stg===s?" selected":""}>${esc(s)}</option>`).join("")}</select></th>
+          <th class="${thCls("stage")}" data-sort="stage">Stage${SI()}${sdd("dstage",[{value:"",label:"All stages"},...stageList().map(s=>({value:s,label:s}))],stg,"All stages")}</th>
           <th class="${thCls("value")}" data-sort="value">Value${SI()}</th>
-          <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}<select class="th-fi" id="dprio"><option value="">All priorities</option>${PRIORITIES.map(p=>`<option value="${esc(p)}"${pr===p?" selected":""}>${esc(p)}</option>`).join("")}</select></th>
-          <th class="${thCls("expectedClose")}" data-sort="expectedClose">Close date${SI()}<select class="th-fi" id="dclosedate">${cdOpts}</select></th>
+          <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}${sdd("dprio",[{value:"",label:"All priorities"},...PRIORITIES.map(p=>({value:p,label:p}))],pr,"All priorities")}</th>
+          <th class="${thCls("expectedClose")}" data-sort="expectedClose">Close date${SI()}${sdd("dclosedate",[{value:"",label:"All close dates"},{value:"overdue",label:"Overdue"},{value:"week",label:"This week"},{value:"month",label:"This month"},{value:"q",label:"This quarter"},{value:"30",label:"Next 30 days"},{value:"set",label:"Has close date"},{value:"none",label:"No close date"},{value:"custom",label:"Custom range…"}],cf,"All close dates")}</th>
           <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="dcf-owner" placeholder="Filter owner…" value="${esc(dcf.owner||"")}"></th>
           <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="dcf-crby" placeholder="Filter creator…" value="${esc(dcf.createdBy||"")}"></th>
+          <th class="${thCls("createdAt")}" data-sort="createdAt">Created${SI()}</th>
           <th></th></tr></thead><tbody>
           ${rows.map(d=>`<tr data-id="${d.id}">
             <td><div style="font-weight:600;font-size:13px">${esc(d.name)}</div></td>
@@ -2037,6 +2053,7 @@ function renderDeals(c){
             <td class="muted">${fmtDate(d.expectedClose)}</td>
             <td>${d.owner?ava(d.owner,24):'<span class="faint">—</span>'}</td>
             <td class="muted" style="font-size:12px">${d.createdBy?esc(d.createdBy):'<span class="faint">—</span>'}</td>
+            <td class="muted" style="font-size:12px">${d.createdAt?fmtDate(d.createdAt):'<span class="faint">—</span>'}</td>
             <td><div class="rowact"><button class="btn ghost sm" data-edit="${d.id}">${I.edit}</button></div></td>
             </tr>`).join("")}
           </tbody></table>`:emptyState("trello","No deals match","Adjust your filters or add a new deal.","New deal","newd2");
@@ -2044,10 +2061,9 @@ function renderDeals(c){
       $("#dtable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;dealForm(tr.dataset.id);});
       $("#dtable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();dealForm(b.dataset.edit);});
       const n2=$("#newd2");if(n2)n2.onclick=()=>dealForm();
-      const stgEl=$("#dstage"),prEl=$("#dprio"),cfEl=$("#dclosedate");
-      if(stgEl){stgEl.onchange=e=>{state._dStageF=e.target.value;draw();};stgEl.onclick=e=>e.stopPropagation();}
-      if(prEl){prEl.onchange=e=>{state._dPrioF=e.target.value;draw();};prEl.onclick=e=>e.stopPropagation();}
-      if(cfEl){cfEl.onchange=e=>{state._dCloseF=e.target.value;const drEl=$("#daterange-row");if(drEl)drEl.style.display=e.target.value==="custom"?"flex":"none";if(e.target.value!=="custom"){state._dDateFrom="";state._dDateTo="";}draw();};cfEl.onclick=e=>e.stopPropagation();}
+      wireSdd("dstage",v=>{state._dStageF=v;draw();});
+      wireSdd("dprio",v=>{state._dPrioF=v;draw();});
+      wireSdd("dclosedate",v=>{state._dCloseF=v;const drEl=$("#daterange-row");if(drEl)drEl.style.display=v==="custom"?"flex":"none";if(v!=="custom"){state._dDateFrom="";state._dDateTo="";}draw();});
       const dcfNameEl=$("#dcf-name"),dcfCoEl=$("#dcf-co"),dcfOwEl=$("#dcf-owner"),dcfCrByEl=$("#dcf-crby");
       if(dcfNameEl){dcfNameEl.oninput=e=>{state._dColF.name=e.target.value;draw();};dcfNameEl.onclick=e=>e.stopPropagation();}
       if(dcfCoEl){dcfCoEl.oninput=e=>{state._dColF.company=e.target.value;draw();};dcfCoEl.onclick=e=>e.stopPropagation();}
@@ -2055,8 +2071,6 @@ function renderDeals(c){
       if(dcfCrByEl){dcfCrByEl.oninput=e=>{state._dColF.createdBy=e.target.value;draw();};dcfCrByEl.onclick=e=>e.stopPropagation();}
     };
     const srEl=$("#dsearch");if(srEl)srEl.oninput=draw;
-    const dfEl=$("#dfrom"),dtEl=$("#dto");if(dfEl)dfEl.onchange=draw;if(dtEl)dtEl.onchange=draw;
-    const dclearBtn=$("#dcleardate");if(dclearBtn)dclearBtn.onclick=()=>{state._dDateFrom="";state._dDateTo="";try{localStorage.removeItem("pulse-deals-datefrom");localStorage.removeItem("pulse-deals-dateto");}catch(_){}renderDeals(c);};
     draw();
   } else {
     const bCloseEl=$("#bclosedate");
@@ -2080,20 +2094,16 @@ function renderDeals(c){
       else if(cf==="30"){if(!dt||dt<_now||dt>=_now+30*864e5)return false;}
       else if(cf==="set"){if(!dt)return false;}
       else if(cf==="none"){if(dt)return false;}
-      if(state._dDateFrom||state._dDateTo){const from=state._dDateFrom?new Date(state._dDateFrom).getTime():0;const to=state._dDateTo?new Date(state._dDateTo).getTime()+864e5-1:Infinity;if(!dt||dt<from||dt>to)return false;}
       return true;
     };
-    const bdfEl=$("#bdfrom"),bdtEl=$("#bdto");
-    if(bdfEl)bdfEl.onchange=()=>{state._dDateFrom=bdfEl.value;try{localStorage.setItem("pulse-deals-datefrom",state._dDateFrom);}catch(_){}renderDeals(c);};
-    if(bdtEl)bdtEl.onchange=()=>{state._dDateTo=bdtEl.value;try{localStorage.setItem("pulse-deals-dateto",state._dDateTo);}catch(_){}renderDeals(c);};
-    const bdclearBtn=$("#bdcleardate");if(bdclearBtn)bdclearBtn.onclick=()=>{state._dDateFrom="";state._dDateTo="";try{localStorage.removeItem("pulse-deals-datefrom");localStorage.removeItem("pulse-deals-dateto");}catch(_){}renderDeals(c);};
     const board=$("#board");
     board.innerHTML=stageList().map(s=>{
       const items=D.filter(d=>d.stage===s&&filterDeal(d)).sort((a,b)=>(a.order||0)-(b.order||0));
       const tot=items.reduce((a,d)=>a+(+d.value||0),0);
       return `<div class="kcol" data-stage="${esc(s)}">
         <div class="kcol-head"><span class="dot" style="background:${stageColor(s)}"></span><span class="nm">${s}</span><span class="ct">${items.length}</span><span class="tot">${moneyK(tot)}</span></div>
-        ${items.map(d=>dealCard(d)).join("")}</div>`;
+        ${items.length?items.map(d=>dealCard(d,bq)).join(""):(bq?`<div class="kcol-empty">No matches</div>`:"")}
+        </div>`;
     }).join("");
     board.querySelectorAll(".dealcard").forEach(card=>{
       card.draggable=true;
@@ -2112,11 +2122,12 @@ function renderDeals(c){
     });
   }
 }
-function dealCard(d){
+function dealCard(d,q){
   const co=companyById(d.companyId);
+  const h=str=>{const s=esc(str||"");if(!q)return s;const sq=esc(q).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");return s.replace(new RegExp(sq,"gi"),m=>`<mark>${m}</mark>`);};
   return `<div class="dealcard" data-id="${d.id}">
-    <div class="dn">${esc(d.name)}</div>
-    ${co?`<div class="dco">${esc(co.name)}</div>`:""}
+    <div class="dn">${h(d.name)}</div>
+    ${co?`<div class="dco">${h(co.name)}</div>`:""}
     <div class="dfoot"><span class="dval">${money(d.value)}</span><span class="prio ${d.priority||"low"}">${esc(d.priority||"low")}</span></div>
     ${d.expectedClose?`<div class="faint" style="font-size:11px">Close ${fmtDate(d.expectedClose)}</div>`:""}
     ${d.renewalDate?`<div class="faint" style="font-size:11px">Renewal ${fmtDate(d.renewalDate)}</div>`:""}</div>`;
@@ -2162,7 +2173,7 @@ function renderTasks(c){
       <tr>
         <th style="width:40px"></th>
         <th class="${thCls("title")}" data-sort="title">Task${SI()}<input class="th-fi" id="cf-ttitle" placeholder="Filter task…" value="${esc(cf.title||"")}"></th>
-        <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}<select class="th-fi" id="cf-tprio"><option value="">All priorities</option>${["high","medium","low"].map(p=>`<option value="${p}"${cf.priority===p?" selected":""}>${p}</option>`).join("")}</select></th>
+        <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}${sdd("cf-tprio",[{value:"",label:"All priorities"},...["high","medium","low"].map(p=>({value:p,label:p}))],cf.priority||"","All priorities")}</th>
         <th class="${thCls("due")}" data-sort="due">Due date${SI()}</th>
         <th class="${thCls("owner")}" data-sort="owner">Owner${SI()}<input class="th-fi" id="cf-towner" placeholder="Filter owner…" value="${esc(cf.owner||"")}"></th>
         <th class="${thCls("createdBy")}" data-sort="createdBy">Created by${SI()}<input class="th-fi" id="cf-tcrby" placeholder="Filter creator…" value="${esc(cf.createdBy||"")}"></th>
@@ -2179,8 +2190,8 @@ function renderTasks(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${t.id}">${I.edit}</button></div></td></tr>`;}).join("")}
       </tbody></table>`:emptyState("check","Nothing here","You're all caught up for this view.","New task","newt2");
     $("#ttable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>setSort(th.dataset.sort));
-    const cfPr=$("#cf-tprio"),cfOw=$("#cf-towner"),cfTi=$("#cf-ttitle"),cfCrBy=$("#cf-tcrby");
-    if(cfPr){cfPr.onchange=e=>{state._tColF.priority=e.target.value;draw();};cfPr.onclick=e=>e.stopPropagation();}
+    const cfOw=$("#cf-towner"),cfTi=$("#cf-ttitle"),cfCrBy=$("#cf-tcrby");
+    wireSdd("cf-tprio",v=>{state._tColF.priority=v;draw();});
     if(cfOw){cfOw.oninput=e=>{state._tColF.owner=e.target.value;draw();};cfOw.onclick=e=>e.stopPropagation();}
     if(cfTi){cfTi.oninput=e=>{state._tColF.title=e.target.value;draw();};cfTi.onclick=e=>e.stopPropagation();}
     if(cfCrBy){cfCrBy.oninput=e=>{state._tColF.createdBy=e.target.value;draw();};cfCrBy.onclick=e=>e.stopPropagation();}
@@ -2265,14 +2276,14 @@ function renderTickets(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td>
       </tr>`;
     }).join("");
-    const tkTypeOpts=`<option value="">All types</option>${(live(state.supportCategories).length?live(state.supportCategories).map(cc=>cc.name):TICKET_TYPES).map(t=>`<option value="${esc(t)}"${ty===t?" selected":""}>${esc(t)}</option>`).join("")}`;
-    const tkStOpts=`<option value="">All statuses</option>${TICKET_STATUS.map(s=>`<option value="${s}"${st===s?" selected":""}>${{open:"Open","in-progress":"In Progress",resolved:"Resolved",closed:"Closed"}[s]||s}</option>`).join("")}`;
-    const tkPrOpts=`<option value="">All priorities</option>${["low","medium","high","urgent"].map(p=>`<option value="${p}"${pr===p?" selected":""}>${p}</option>`).join("")}`;
+    const tkTyArr=[{value:"",label:"All types"},...(live(state.supportCategories).length?live(state.supportCategories).map(cc=>cc.name):TICKET_TYPES).map(t=>({value:t,label:t}))];
+    const tkStArr=[{value:"",label:"All statuses"},...TICKET_STATUS.map(s=>({value:s,label:{open:"Open","in-progress":"In Progress",resolved:"Resolved",closed:"Closed"}[s]||s}))];
+    const tkPrArr=[{value:"",label:"All priorities"},...["low","medium","high","urgent"].map(p=>({value:p,label:p}))];
     $("#tktable").innerHTML=rows.length?`<table><thead>
       <tr>
-        <th class="${thCls("subject")}" data-sort="subject">Subject${SI()}<select class="th-fi" id="tktype">${tkTypeOpts}</select></th>
-        <th class="${thCls("status")}" data-sort="status">Status${SI()}<select class="th-fi" id="tkstatus">${tkStOpts}</select></th>
-        <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}<select class="th-fi" id="tkprio">${tkPrOpts}</select></th>
+        <th class="${thCls("subject")}" data-sort="subject">Subject${SI()}${sdd("tktype",tkTyArr,ty,"All types")}</th>
+        <th class="${thCls("status")}" data-sort="status">Status${SI()}${sdd("tkstatus",tkStArr,st,"All statuses")}</th>
+        <th class="${thCls("priority")}" data-sort="priority">Priority${SI()}${sdd("tkprio",tkPrArr,pr,"All priorities")}</th>
         <th>SLA</th>
         <th class="${thCls("company")}" data-sort="company">Company${SI()}<input class="th-fi" id="tk-co" placeholder="Filter company…" value="${esc(state._tkColF.company||"")}"></th>
         <th>Contact<input class="th-fi" id="tk-ct" placeholder="Filter contact…" value="${esc(state._tkColF.contact||"")}"></th>
@@ -2284,10 +2295,9 @@ function renderTickets(c){
     $("#tktable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();ticketForm(b.dataset.edit);});
     $("#tktable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"ticket",id:tr.dataset.id};render();});
     const n2=$("#newtk2");if(n2)n2.onclick=()=>ticketForm();
-    const tkStEl=$("#tkstatus"),tkPrEl=$("#tkprio"),tkTyEl=$("#tktype");
-    if(tkStEl){tkStEl.onchange=e=>{state._tkColF.status=e.target.value;draw();};tkStEl.onclick=e=>e.stopPropagation();}
-    if(tkPrEl){tkPrEl.onchange=e=>{state._tkColF.priority=e.target.value;draw();};tkPrEl.onclick=e=>e.stopPropagation();}
-    if(tkTyEl){tkTyEl.onchange=e=>{state._tkColF.type=e.target.value;draw();};tkTyEl.onclick=e=>e.stopPropagation();}
+    wireSdd("tkstatus",v=>{state._tkColF.status=v;draw();});
+    wireSdd("tkprio",v=>{state._tkColF.priority=v;draw();});
+    wireSdd("tktype",v=>{state._tkColF.type=v;draw();});
     const tkCoEl=$("#tk-co"),tkCtEl=$("#tk-ct"),tkOwEl=$("#tk-owner");
     if(tkCoEl){tkCoEl.oninput=e=>{state._tkColF.company=e.target.value;draw();};tkCoEl.onclick=e=>e.stopPropagation();}
     if(tkCtEl){tkCtEl.oninput=e=>{state._tkColF.contact=e.target.value;draw();};tkCtEl.onclick=e=>e.stopPropagation();}
@@ -3328,7 +3338,7 @@ function wireDlines(){
 function dealForm(id,defaults={}){
   const x=id?state.deals.find(d=>d.id===id):defaults;
   const contactOpts=[{v:"",l:"— None —"},...live(state.contacts).map(c=>({v:c.id,l:contactName(c)}))];
-  const body=`${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
+  const body=`${id&&x.createdAt?`<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Created ${fmtDate(x.createdAt)}${x.createdBy?" by "+esc(x.createdBy):""}</div>`:""}${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
     <div class="field-row">${field("d_value","Value (USD)",{value:x.value,type:"number"})}${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:stageList()})}</div>
     <div class="field-row">${field("d_company","Company",{type:"select",value:x.companyId,options:companyOptions()})}${field("d_contact","Primary contact",{type:"select",value:x.contactId,options:contactOpts})}</div>
     <div class="field-row">${field("d_prio","Priority",{type:"select",value:x.priority||"medium",options:PRIORITIES})}${field("d_close","Expected close",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}</div>
@@ -4085,6 +4095,7 @@ function openCmdk(){
   build("");setTimeout(()=>inp.focus(),60);
 }
 function closeCmdk(){state.cmdk=false;$("#cmdk").classList.remove("show");}
+document.addEventListener("click",()=>document.querySelectorAll(".sdd.open").forEach(s=>s.classList.remove("open")));
 document.addEventListener("keydown",e=>{
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();state.user&&(state.cmdk?closeCmdk():openCmdk());}
   if(e.key==="Escape"){closeDrawer();if(state.aiOpen)closeAI();if(state.cmdk)closeCmdk();}
