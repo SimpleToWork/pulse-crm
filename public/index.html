@@ -3931,7 +3931,7 @@ function subscribe(){
     state[name]=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}}
     render();
-  },err=>console.error(name,err)));
+  },err=>{console.error(name,err);if(err&&err.code==="permission-denied")toast(`Firestore rules block '${name}' — run: npm run deploy:rules`,"err");}));
 }
 
 if(fbReady){

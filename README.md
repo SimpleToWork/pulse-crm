@@ -74,7 +74,19 @@ co-located serverless functions.
 
 ### 4) Lock down Firestore before launch
 
-Deploy the security rules (requires [Firebase CLI](https://firebase.google.com/docs/cli)):
+The Firestore security rules are **auto-deployed** via GitHub Actions whenever `firestore.rules`
+changes on the `master` branch. This requires a one-time secret setup:
+
+1. Generate a Firebase CI token: `firebase login:ci` → copy the token
+2. In GitHub → repo Settings → Secrets and variables → Actions, add secret:
+   - Name: `FIREBASE_TOKEN`
+   - Value: the token from step 1
+
+Once that secret exists, every merge to `master` that touches `firestore.rules` automatically
+runs `firebase deploy --only firestore:rules`. You can also trigger it manually via
+GitHub → Actions → "Deploy Firestore Rules" → Run workflow.
+
+**Manual deploy** (if you haven't set up the secret yet):
 
 ```bash
 npm install -g firebase-tools
@@ -84,7 +96,8 @@ npm run deploy:rules   # or: firebase deploy --only firestore:rules
 
 The rules in `firestore.rules` allow access only to signed-in, email-verified users on your
 Workspace domain, and only to the app's known collections. **This step is required** — without
-it every Firestore write will be rejected with "Missing or insufficient permissions."
+it every Firestore write will be rejected with "Missing or insufficient permissions." The app
+will show a toast naming the blocked collection when this happens.
 
 > Alternatively, paste the contents of `firestore.rules` into the Firebase console →
 > Firestore Database → Rules tab for project `pulse-crm-60582`.
