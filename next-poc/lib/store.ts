@@ -47,16 +47,20 @@ export const useStore = create<AppState>((set) => ({
 
 const live = <T extends { deletedAt?: number | null }>(arr: T[]) => arr.filter((x) => !x.deletedAt);
 
+// Stable empty-array reference: returning a fresh `[]` from a selector makes
+// zustand see a new value every render → infinite re-render loop (React #185).
+const EMPTY: any[] = [];
+
 // Typed, memo-friendly selectors (components subscribe only to what they read).
-export const useContactsData = () => useStore((s) => (s.collections.contacts as Contact[]) || []);
-export const useCompaniesData = () => useStore((s) => (s.collections.companies as Company[]) || []);
-export const useDealsData = () => useStore((s) => (s.collections.deals as Deal[]) || []);
-export const useTasksData = () => useStore((s) => (s.collections.tasks as Task[]) || []);
-export const useTicketsData = () => useStore((s) => (s.collections.tickets as Ticket[]) || []);
+export const useContactsData = () => useStore((s) => (s.collections.contacts as Contact[]) || EMPTY);
+export const useCompaniesData = () => useStore((s) => (s.collections.companies as Company[]) || EMPTY);
+export const useDealsData = () => useStore((s) => (s.collections.deals as Deal[]) || EMPTY);
+export const useTasksData = () => useStore((s) => (s.collections.tasks as Task[]) || EMPTY);
+export const useTicketsData = () => useStore((s) => (s.collections.tickets as Ticket[]) || EMPTY);
+export const useTemplatesData = () => useStore((s) => (s.collections.templates as Template[]) || EMPTY);
 export const useLiveContacts = () => live(useContactsData());
 export const useLiveCompanies = () => live(useCompaniesData());
 export const useLiveDeals = () => live(useDealsData());
 export const useLiveTasks = () => live(useTasksData());
 export const useLiveTickets = () => live(useTicketsData());
-export const useTemplatesData = () => useStore((s) => (s.collections.templates as Template[]) || []);
 export const useLiveTemplates = () => live(useTemplatesData());
