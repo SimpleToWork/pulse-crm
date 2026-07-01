@@ -1615,6 +1615,10 @@ function render(){
   renderSidebar(); renderTopbar(); renderContent(); renderAI();
   syncStickyOffsets();
 }
+// Coalesce bursts of data-driven renders (e.g. the 14 Firestore onSnapshot
+// listeners all firing on load) into a single render so the UI doesn't flicker.
+let _renderTimer=null;
+function scheduleRender(){ clearTimeout(_renderTimer); _renderTimer=setTimeout(()=>{_renderTimer=null;render();},48); }
 // Sticky table headers stick below the (also-sticky) .page-top, not on top of it.
 // page-top height varies per view / on resize, so expose it as a CSS var.
 function syncStickyOffsets(){
@@ -4387,7 +4391,7 @@ function subscribe(){
   colls.forEach(name=>onSnapshot(collection(db,name),snap=>{
     state[name]=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}}
-    render();
+    scheduleRender();
   },err=>{console.error(name,err);if(err&&err.code==="permission-denied")toast(`Firestore rules block '${name}' — run: npm run deploy:rules`,"err");}));
 }
 
