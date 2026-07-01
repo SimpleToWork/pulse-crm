@@ -3,13 +3,14 @@ import { useMemo } from "react";
 import type { Company } from "@/lib/types";
 import { OPEN_STAGES } from "@/lib/types";
 import { initials, colorFor, moneyK } from "@/lib/format";
-import { useLiveCompanies, useLiveContacts, useLiveDeals } from "@/lib/store";
+import { useLiveCompanies, useLiveContacts, useLiveDeals, useStore } from "@/lib/store";
 import DataTable, { type Column } from "@/components/DataTable";
 
 export default function CompaniesView() {
   const companies = useLiveCompanies();
   const contacts = useLiveContacts();
   const deals = useLiveDeals();
+  const openDrawer = useStore((s) => s.openDrawer);
 
   // per-company aggregates, computed once
   const { contactCount, openValue } = useMemo(() => {
@@ -39,9 +40,10 @@ export default function CompaniesView() {
     <>
       <div className="pagehead">
         <div><h1>Companies</h1><div className="sub">{companies.length.toLocaleString()} companies</div></div>
-        <button className="btn primary">+ New company</button>
+        <button className="btn primary" onClick={() => openDrawer("company")}>+ New company</button>
       </div>
       <DataTable rows={companies} columns={columns} rowKey={(c) => c.id}
+        onRowClick={(c) => openDrawer("company", c.id)}
         defaultCompare={(a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)} />
     </>
   );

@@ -3,16 +3,17 @@ import { useState } from "react";
 import type { Deal } from "@/lib/types";
 import { STAGES } from "@/lib/types";
 import { money, moneyK, STAGE_COLOR } from "@/lib/format";
-import { useStore, useDealsData } from "@/lib/store";
+import { useStore } from "@/lib/store";
+import { dbUpdate } from "@/lib/db";
 
 export default function DealsBoard({ deals, coName }: { deals: Deal[]; coName: (id?: string | null) => string }) {
-  const rawDeals = useDealsData();
-  const setCollection = useStore((s) => s.setCollection);
+  const openDrawer = useStore((s) => s.openDrawer);
   const [dropStage, setDropStage] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
   const moveTo = (id: string, stage: string) => {
-    setCollection("deals", rawDeals.map((d) => (d.id === id ? { ...d, stage, updatedAt: Date.now() } : d)));
+    const d = deals.find((x) => x.id === id);
+    if (d && d.stage !== stage) dbUpdate("deals", id, { stage });
   };
 
   return (
@@ -40,6 +41,7 @@ export default function DealsBoard({ deals, coName }: { deals: Deal[]; coName: (
                 draggable
                 onDragStart={() => setDragId(d.id)}
                 onDragEnd={() => setDragId(null)}
+                onClick={() => openDrawer("deal", d.id)}
               >
                 <div className="dc-name">{d.name}</div>
                 <div className="dc-co">{coName(d.companyId) || "—"}</div>

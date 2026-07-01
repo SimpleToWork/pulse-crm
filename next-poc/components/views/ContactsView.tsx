@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import type { Contact } from "@/lib/types";
 import { initials, colorFor, fmtDate, STATUS_COLOR } from "@/lib/format";
-import { useLiveContacts, useCompaniesData } from "@/lib/store";
+import { useLiveContacts, useCompaniesData, useStore } from "@/lib/store";
 import DataTable, { type Column } from "@/components/DataTable";
 
 const contactName = (c: Contact) => `${c.firstName || ""} ${c.lastName || ""}`.trim();
@@ -10,6 +10,7 @@ const contactName = (c: Contact) => `${c.firstName || ""} ${c.lastName || ""}`.t
 export default function ContactsView() {
   const contacts = useLiveContacts();
   const companies = useCompaniesData();
+  const openDrawer = useStore((s) => s.openDrawer);
   const coName = useMemo(() => {
     const m = new Map(companies.map((c) => [c.id, c.name]));
     return (id?: string | null) => (id ? m.get(id) || "" : "");
@@ -39,9 +40,10 @@ export default function ContactsView() {
     <>
       <div className="pagehead">
         <div><h1>Contacts</h1><div className="sub">{contacts.length.toLocaleString()} people in your CRM</div></div>
-        <button className="btn primary">+ New contact</button>
+        <button className="btn primary" onClick={() => openDrawer("contact")}>+ New contact</button>
       </div>
       <DataTable rows={contacts} columns={columns} rowKey={(c) => c.id}
+        onRowClick={(c) => openDrawer("contact", c.id)}
         defaultCompare={(a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)} />
     </>
   );

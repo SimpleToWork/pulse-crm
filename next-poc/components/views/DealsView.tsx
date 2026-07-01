@@ -3,13 +3,14 @@ import { useMemo, useState } from "react";
 import type { Deal } from "@/lib/types";
 import { OPEN_STAGES } from "@/lib/types";
 import { money, moneyK, fmtDate, STAGE_COLOR } from "@/lib/format";
-import { useLiveDeals, useCompaniesData } from "@/lib/store";
+import { useLiveDeals, useCompaniesData, useStore } from "@/lib/store";
 import DataTable, { type Column } from "@/components/DataTable";
 import DealsBoard from "./DealsBoard";
 
 export default function DealsView() {
   const deals = useLiveDeals();
   const companies = useCompaniesData();
+  const openDrawer = useStore((s) => s.openDrawer);
   const [view, setView] = useState<"board" | "list">("board");
 
   const coName = useMemo(() => {
@@ -41,12 +42,12 @@ export default function DealsView() {
             <button className={view === "board" ? "on" : ""} onClick={() => setView("board")}>Board</button>
             <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}>List</button>
           </div>
-          <button className="btn primary">+ New deal</button>
+          <button className="btn primary" onClick={() => openDrawer("deal")}>+ New deal</button>
         </div>
       </div>
       {view === "board"
         ? <DealsBoard deals={deals} coName={coName} />
-        : <DataTable rows={deals} columns={columns} rowKey={(d) => d.id} defaultCompare={(a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)} />}
+        : <DataTable rows={deals} columns={columns} rowKey={(d) => d.id} onRowClick={(d) => openDrawer("deal", d.id)} defaultCompare={(a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)} />}
     </>
   );
 }

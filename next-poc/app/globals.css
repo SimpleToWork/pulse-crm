@@ -211,3 +211,20 @@ tbody tr:hover{background:var(--surface-2);}
 .qb-total{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0 0;margin-top:6px;font-weight:700;font-size:16px;}
 .qb-total .val{font-family:"Space Grotesk",Inter,sans-serif;}
 .qb-impl{background:var(--surface-2);border-radius:9px;padding:10px 12px;margin-top:12px;display:flex;justify-content:space-between;font-size:13px;font-weight:600;}
+.qb-field select,.qb-field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13px;background:var(--surface);color:var(--ink);outline:none;font-family:inherit;}
+.qb-field select:focus,.qb-field textarea:focus{border-color:var(--accent);}
+
+/* Drawer + toasts */
+.scrim{position:fixed;inset:0;background:rgba(16,19,34,.35);z-index:100;}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:430px;max-width:92vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);z-index:110;display:flex;flex-direction:column;animation:slidein .18s ease;}
+@keyframes slidein{from{transform:translateX(30px);opacity:.4}to{transform:none;opacity:1}}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);}
+.drawer-head h2{margin:0;font-size:16px;font-family:"Space Grotesk",Inter,sans-serif;text-transform:capitalize;}
+.drawer-body{flex:1;overflow-y:auto;padding:18px 20px;scrollbar-width:thin;}
+.drawer-foot{display:flex;align-items:center;gap:8px;padding:14px 20px;border-top:1px solid var(--line);}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 30%,var(--line));}
+.btn.danger:hover{background:color-mix(in srgb,var(--danger) 10%,transparent);}
+.toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;}
+.toast{background:var(--ink);color:var(--canvas);padding:9px 16px;border-radius:9px;font-size:13px;box-shadow:var(--shadow-lg);animation:slidein .18s ease;}
+.toast.ok{background:var(--ok);color:#fff;}
+.toast.err{background:var(--danger);color:#fff;}

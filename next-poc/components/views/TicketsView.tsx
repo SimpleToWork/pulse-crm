@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import type { Ticket } from "@/lib/types";
 import { fmtDate } from "@/lib/format";
-import { useLiveTickets, useCompaniesData } from "@/lib/store";
+import { useLiveTickets, useCompaniesData, useStore } from "@/lib/store";
 import DataTable, { type Column } from "@/components/DataTable";
 
 const TK_STATUS_LABEL: Record<string, string> = { open: "Open", "in-progress": "In Progress", resolved: "Resolved", closed: "Closed" };
@@ -12,6 +12,7 @@ const TK_PRIO_COLOR: Record<string, string> = { urgent: "#7c3aed", high: "#dc262
 export default function TicketsView() {
   const tickets = useLiveTickets();
   const companies = useCompaniesData();
+  const openDrawer = useStore((s) => s.openDrawer);
   const coName = useMemo(() => {
     const m = new Map(companies.map((c) => [c.id, c.name]));
     return (id?: string | null) => (id ? m.get(id) || "" : "");
@@ -34,9 +35,10 @@ export default function TicketsView() {
     <>
       <div className="pagehead">
         <div><h1>Support Tickets</h1><div className="sub">{tickets.length} tickets · {open} open</div></div>
-        <button className="btn primary">+ New ticket</button>
+        <button className="btn primary" onClick={() => openDrawer("ticket")}>+ New ticket</button>
       </div>
       <DataTable rows={tickets} columns={columns} rowKey={(t) => t.id}
+        onRowClick={(t) => openDrawer("ticket", t.id)}
         defaultCompare={(a, b) => (b.createdAt || 0) - (a.createdAt || 0)} />
     </>
   );

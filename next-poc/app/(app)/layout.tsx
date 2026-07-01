@@ -2,6 +2,8 @@
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import LoginScreen from "@/components/LoginScreen";
+import Toasts from "@/components/Toasts";
+import EntityForm from "@/components/forms/EntityForm";
 import { useStore } from "@/lib/store";
 import { firebaseReady } from "@/lib/firebase";
 
@@ -24,6 +26,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </div>
+      <EntityForm />
+      <Toasts />
     </div>
   );
 }
