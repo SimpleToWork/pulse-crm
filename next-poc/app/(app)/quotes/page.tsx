@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Quote Builder" />; }
+import QuoteBuilderView from "@/components/views/QuoteBuilderView";
+export default function Page() { return <QuoteBuilderView />; }
