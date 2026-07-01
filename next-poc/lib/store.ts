@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import type { Contact, Company } from "./types";
+import type { Contact, Company, Deal, Task, Ticket } from "./types";
 
 export interface User { name: string; email: string; uid?: string; }
 export type Theme = "light" | "dark";
@@ -34,4 +34,11 @@ const live = <T extends { deletedAt?: number | null }>(arr: T[]) => arr.filter((
 // Typed, memo-friendly selectors (components subscribe only to what they read).
 export const useContactsData = () => useStore((s) => (s.collections.contacts as Contact[]) || []);
 export const useCompaniesData = () => useStore((s) => (s.collections.companies as Company[]) || []);
+export const useDealsData = () => useStore((s) => (s.collections.deals as Deal[]) || []);
+export const useTasksData = () => useStore((s) => (s.collections.tasks as Task[]) || []);
+export const useTicketsData = () => useStore((s) => (s.collections.tickets as Ticket[]) || []);
 export const useLiveContacts = () => live(useContactsData());
+export const useLiveCompanies = () => live(useCompaniesData());
+export const useLiveDeals = () => live(useDealsData());
+export const useLiveTasks = () => live(useTasksData());
+export const useLiveTickets = () => live(useTicketsData());

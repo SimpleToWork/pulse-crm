@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Companies" />; }
+import CompaniesView from "@/components/views/CompaniesView";
+export default function Page() { return <CompaniesView />; }

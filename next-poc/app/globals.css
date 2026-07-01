@@ -112,3 +112,26 @@ tbody tr:hover{background:var(--surface-2);}
 .gbtn{width:100%;justify-content:center;margin-top:14px;}
 .stub{padding:60px 40px;text-align:center;color:var(--muted);}
 .stub h1{font-family:"Space Grotesk",Inter,sans-serif;color:var(--ink);}
+
+/* Deals board (kanban) */
+.viewtoggle{display:inline-flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:2px;}
+.viewtoggle button{border:none;background:none;color:var(--muted);font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;}
+.viewtoggle button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:264px;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:start;scrollbar-width:thin;}
+.kcol{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-height:120px;transition:outline .12s,background .12s;}
+.kcol.drop{outline:2px dashed var(--accent);outline-offset:-3px;background:var(--accent-soft);}
+.kcol-head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:2px 4px 4px;}
+.kcol-head .cnt{color:var(--faint);font-weight:500;margin-left:auto;}
+.dealcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 11px;cursor:grab;box-shadow:var(--shadow);}
+.dealcard.dragging{opacity:.4;}
+.dc-name{font-weight:600;font-size:13px;}
+.dc-co{color:var(--muted);font-size:11.5px;margin-top:2px;}
+.dc-foot{display:flex;align-items:center;justify-content:space-between;margin-top:9px;}
+.dc-val{font-weight:700;font-size:13px;}
+.prio{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:20px;}
+.prio.low{background:#eef1f6;color:#64748b;}
+.prio.medium{background:#fdf2e0;color:#b7791f;}
+.prio.high{background:#fde8e8;color:#c53030;}
+[data-theme=dark] .prio.low{background:#252a38;color:#94a3b8;}
+[data-theme=dark] .prio.medium{background:#3a2f10;color:#e8b84a;}
+[data-theme=dark] .prio.high{background:#3a1a1a;color:#f08a8a;}

@@ -39,6 +39,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       const d = makeDemo(500);
       setCollection("contacts", d.contacts);
       setCollection("companies", d.companies);
+      setCollection("deals", d.deals);
+      setCollection("tasks", d.tasks);
+      setCollection("tickets", d.tickets);
       return;
     }
     let unsub: Array<() => void> = [];
