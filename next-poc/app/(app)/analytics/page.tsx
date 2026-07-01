@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Analytics" />; }
+import AnalyticsView from "@/components/views/AnalyticsView";
+export default function Page() { return <AnalyticsView />; }

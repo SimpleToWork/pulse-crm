@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Dashboard" />; }
+import DashboardView from "@/components/views/DashboardView";
+export default function Page() { return <DashboardView />; }
