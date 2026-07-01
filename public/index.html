@@ -3776,19 +3776,19 @@ function quoteBuilderModal(prefill,editId){
       const nm=tr.querySelector(".qb-int-name");if(nm)nm.style.fontWeight=on?600:400;
     });
     const q=collect();const t=computeQuoteTotals(q);
-    if(!bundleTouched){const be=overlay.querySelector("#qb-bundle");if(be)be.value=Math.round(t.perIntegrationMonthly);}
+    if(!bundleTouched){const be=overlay.querySelector("#qb-bundle");if(be)be.value=t.perIntegrationMonthly;}
     overlay.querySelector("#qb-summary").innerHTML=summaryHtml(collect(),computeQuoteTotals(collect()));
   }
 
   // wire table rows — checkbox or row click toggles selection
   box.querySelectorAll("tr[data-int-id]").forEach(tr=>{
     const cb=tr.querySelector(".qb-cb");
-    const toggle=()=>{const id=tr.dataset.intId;if(sel.has(id))sel.delete(id);else sel.add(id);paint();};
+    const toggle=()=>{const id=tr.dataset.intId;if(sel.has(id))sel.delete(id);else sel.add(id);bundleTouched=false;paint();};
     if(cb)cb.onchange=toggle;
     tr.onclick=e=>{if(e.target===cb||e.target.closest("input"))return;toggle();};
   });
   // quoted price inputs trigger repaint
-  box.querySelectorAll(".qb-qi,.qb-qm").forEach(inp=>inp.oninput=paint);
+  box.querySelectorAll(".qb-qi").forEach(inp=>inp.oninput=paint);box.querySelectorAll(".qb-qm").forEach(inp=>inp.oninput=()=>{bundleTouched=false;paint();});
   // integration search filter
   const intSearch=overlay.querySelector("#qb-int-search");
   const intEmpty=overlay.querySelector("#qb-int-empty");
