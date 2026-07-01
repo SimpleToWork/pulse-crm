@@ -4,6 +4,7 @@ import Topbar from "@/components/Topbar";
 import LoginScreen from "@/components/LoginScreen";
 import Toasts from "@/components/Toasts";
 import EntityForm from "@/components/forms/EntityForm";
+import AiAssistant from "@/components/AiAssistant";
 import { useStore } from "@/lib/store";
 import { firebaseReady } from "@/lib/firebase";
 
@@ -27,6 +28,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <EntityForm />
+      <AiAssistant />
       <Toasts />
     </div>
   );
