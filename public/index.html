@@ -2929,8 +2929,7 @@ function renderSettings(c){
   c.querySelectorAll("[data-edit-prod]").forEach(b=>b.onclick=()=>productForm(b.dataset.editProd));
   c.querySelectorAll("[data-del-prod]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this product?"))return;await dbRemove("products",b.dataset.delProd,"Product");render();});
   $("#addintprice").onclick=()=>integrationPricingModal(null,c);
-  c.querySelectorAll("[data-intprice-save]").forEach(b=>b.onclick=async()=>{
-    const intId=b.dataset.intpriceSave;
+  const saveIntPriceRow=async(intId,silent)=>{
     const row=c.querySelector(`[data-intprice-row="${intId}"]`);
     if(!row)return;
     const name=row.querySelector('[data-intprice-field="name"]').value.trim();
@@ -2945,7 +2944,14 @@ function renderSettings(c){
     const ok=qs._id
       ?await dbUpdate("quoteSettings",qs._id,{integrations:newInts},true)
       :(await dbAdd("quoteSettings",{ai:qs.ai,integrations:newInts},true))!=null;
-    if(ok)toast("Integration updated","ok");
+    if(ok&&!silent)toast("Integration updated","ok");
+  };
+  c.querySelectorAll("[data-intprice-save]").forEach(b=>b.onclick=()=>saveIntPriceRow(b.dataset.intpriceSave,false));
+  c.querySelectorAll("[data-intprice-row]").forEach(row=>{
+    const intId=row.dataset.intpriceRow;
+    row.querySelectorAll("input[data-intprice-field]").forEach(inp=>inp.addEventListener("blur",()=>saveIntPriceRow(intId,true)));
+    const lvlSel=row.querySelector("select[data-intprice-field]");
+    if(lvlSel)lvlSel.addEventListener("change",()=>saveIntPriceRow(intId,true));
   });
   c.querySelectorAll("[data-intprice-del]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Remove this integration from the pricing table?"))return;
@@ -3546,15 +3552,16 @@ function computeQuoteTotals(q){
   const timelineDays=ints.reduce((m,it)=>Math.max(m,+it.timeline||0),0);
   const users=Math.max(0,+(q.users?.count)||0);
   const pricePerUser=Math.max(0,+(q.users?.pricePerUser)||0);
+  const aiLicenseCount=Math.max(0,+(q.users?.aiLicenseCount!=null?q.users.aiLicenseCount:q.users?.count)||0);
   const aiPricePerUser=(+(q.aiCostOverride)>0?+(q.aiCostOverride):state._aiCostPerUser>0?state._aiCostPerUser:d.fullyLoaded); // per-quote override > Settings default > computed
-  const aiMonthly=users*aiPricePerUser;
+  const aiMonthly=aiLicenseCount*aiPricePerUser;
   const seatMonthly=users*pricePerUser;
   const bundleMonthly=Math.max(0,+(q.addons?.bundlePrice)||0);
   const dataMonthly=Math.max(0,+(q.addons?.dataVolume)||0);
   const monthly=aiMonthly+seatMonthly+bundleMonthly+dataMonthly;
   const annual=monthly*12;
   const processingCost=seatMonthly*(q.ai?.paymentProcessing||0);
-  return {implementation,perIntegrationMonthly,timelineDays,aiPricePerUser,aiMonthly,seatMonthly,bundleMonthly,dataMonthly,monthly,annual,processingCost,users,pricePerUser};
+  return {implementation,perIntegrationMonthly,timelineDays,aiPricePerUser,aiMonthly,seatMonthly,bundleMonthly,dataMonthly,monthly,annual,processingCost,users,pricePerUser,aiLicenseCount};
 }
 function quoteContext(){
   const Q=live(state.quotes);
@@ -3712,12 +3719,13 @@ function quoteBuilderModal(prefill,editId,onSaved){
         </div>
         <div class="qb-section">
           <div class="qb-h">2 · Users &amp; AI</div>
-          <div class="qb-inputs2">
-            <div class="field" style="margin:0"><label>AI users (seats)</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??20}"></div>
-            <div class="field" style="margin:0"><label>Price / user / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??25}"></div>
-            <div class="field" style="margin:0"><label>AI usage cost / user / mo ($)</label><input id="qb-ai-cost" type="number" min="0" step="0.01" value="${prefill?.aiCostOverride>0?prefill.aiCostOverride:(state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2))}"></div>
+          <div class="qb-inputs2" style="grid-template-columns:repeat(4,1fr)">
+            <div class="field" style="margin:0"><label>Number of Users</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??20}"></div>
+            <div class="field" style="margin:0"><label>Price Per User / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??25}"></div>
+            <div class="field" style="margin:0"><label>Number of AI Licenses</label><input id="qb-ai-users" type="number" min="0" step="1" value="${prefill?.users?.aiLicenseCount??prefill?.users?.count??20}"></div>
+            <div class="field" style="margin:0"><label>Amount Per AI License / mo ($)</label><input id="qb-ai-cost" type="number" min="0" step="0.01" value="${prefill?.aiCostOverride>0?prefill.aiCostOverride:(state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2))}"></div>
           </div>
-          <div class="faint" style="font-size:11.5px;margin-top:4px">Defaults to the value configured in Settings. Edit to override for this quote only.</div>
+          <div class="faint" style="font-size:11.5px;margin-top:4px">AI license count and amount default to Settings values. Edit either to override for this quote only.</div>
         </div>
         <div class="qb-section">
           <div class="qb-h">3 · Add-ons</div>
@@ -3752,7 +3760,7 @@ function quoteBuilderModal(prefill,editId,onSaved){
     });
     return {
       integrations:selectedInts,
-      users:{count:numIn("qb-users"),pricePerUser:numIn("qb-price")},
+      users:{count:numIn("qb-users"),pricePerUser:numIn("qb-price"),aiLicenseCount:numIn("qb-ai-users")},
       addons:{bundlePrice:numIn("qb-bundle"),dataVolume:numIn("qb-data")},
       ai,
       aiCostOverride:numIn("qb-ai-cost"),
@@ -3771,7 +3779,7 @@ function quoteBuilderModal(prefill,editId,onSaved){
       </div>
       <div class="qb-sum-block">
         <div class="qb-sum-lbl">Monthly subscription</div>
-        ${line("AI usage",money(t.aiMonthly),`${t.users} × ${fmtUSD(t.aiPricePerUser)}`)}
+        ${line("AI licenses",money(t.aiMonthly),`${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)}`)}
         ${line("User seats",money(t.seatMonthly),`${t.users} × ${money(t.pricePerUser)}`)}
         ${line("Integration bundle",money(t.bundleMonthly))}
         ${line("Data volume",money(t.dataMonthly))}
@@ -3909,7 +3917,7 @@ function quoteViewModal(quote){
     </div>
     <div class="qsec"><h3>Integrations &amp; implementation</h3>${intTable}</div>
     <div class="qsec"><h3>Monthly subscription</h3><table class="qtable"><tbody>
-      <tr><td>AI usage <span style="color:#999">(${t.users} users × ${fmtUSD(t.aiPricePerUser)})</span></td><td style="text-align:right">${money(t.aiMonthly)}</td></tr>
+      <tr><td>AI licenses <span style="color:#999">(${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)})</span></td><td style="text-align:right">${money(t.aiMonthly)}</td></tr>
       <tr><td>User seats <span style="color:#999">(${t.users} × ${money(t.pricePerUser)})</span></td><td style="text-align:right">${money(t.seatMonthly)}</td></tr>
       <tr><td>Integration bundle</td><td style="text-align:right">${money(t.bundleMonthly)}</td></tr>
       <tr><td>Data volume add-on</td><td style="text-align:right">${money(t.dataMonthly)}</td></tr>
@@ -3947,7 +3955,7 @@ function quoteViewModal(quote){
 
   const plain=()=>{
     const il=ints.map(it=>`  ${(it.name+" ×"+it.qty).padEnd(30)} impl ${money(it.implCost*it.qty)}  mo ${money(it.monthlyCost*it.qty)}`).join("\n");
-    return `QUOTE — ${quote.name||""}\nDate: ${qDate}   Status: ${quote.status||"draft"}\n\nBILL TO: ${co?.name||"—"}${ct?" / "+contactName(ct):""}\n\nINTEGRATIONS & IMPLEMENTATION:\n${il||"  (none)"}\n\nMONTHLY:\n  AI usage (${t.users} × ${fmtUSD(t.aiPricePerUser)}): ${money(t.aiMonthly)}\n  User seats (${t.users} × ${money(t.pricePerUser)}): ${money(t.seatMonthly)}\n  Integration bundle: ${money(t.bundleMonthly)}\n  Data volume: ${money(t.dataMonthly)}\n\n  Implementation (one-time): ${money(t.implementation)}\n  Monthly subscription:      ${money(t.monthly)}\n  Annual subscription:       ${money(t.annual)}${t.timelineDays?`\n  Est. timeline:             ${t.timelineDays} days`:""}\n\nPricing frozen at creation. Subject to final contract terms.`;
+    return `QUOTE — ${quote.name||""}\nDate: ${qDate}   Status: ${quote.status||"draft"}\n\nBILL TO: ${co?.name||"—"}${ct?" / "+contactName(ct):""}\n\nINTEGRATIONS & IMPLEMENTATION:\n${il||"  (none)"}\n\nMONTHLY:\n  AI licenses (${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)}): ${money(t.aiMonthly)}\n  User seats (${t.users} × ${money(t.pricePerUser)}): ${money(t.seatMonthly)}\n  Integration bundle: ${money(t.bundleMonthly)}\n  Data volume: ${money(t.dataMonthly)}\n\n  Implementation (one-time): ${money(t.implementation)}\n  Monthly subscription:      ${money(t.monthly)}\n  Annual subscription:       ${money(t.annual)}${t.timelineDays?`\n  Est. timeline:             ${t.timelineDays} days`:""}\n\nPricing frozen at creation. Subject to final contract terms.`;
   };
   overlay.querySelector("#qvCopy").onclick=()=>navigator.clipboard.writeText(plain()).then(()=>toast("Quote copied","ok")).catch(()=>toast("Copy failed","err"));
   overlay.querySelector("#qvDl").onclick=()=>{const a=document.createElement("a");const slug=(quote.name||"quote").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");a.href=URL.createObjectURL(new Blob([plain()],{type:"text/plain"}));a.download=`${slug||"quote"}.txt`;a.click();URL.revokeObjectURL(a.href);toast("Quote downloaded","ok");};
@@ -3957,7 +3965,7 @@ function quoteViewModal(quote){
     const ctx=`This is a SAVED quote. Use ONLY these snapshotted numbers — do not use current settings or invent values.\n`+
       `Quote: ${quote.name}; company ${co?.name||"—"}.\n`+
       `Integrations: ${ints.map(it=>`${it.name} ×${it.qty} (impl ${money(it.implCost)} ea, ${money(it.monthlyCost)}/mo ea)`).join("; ")||"none"}.\n`+
-      `Users ${t.users} @ ${money(t.pricePerUser)}/seat; AI price/user ${fmtUSD(t.aiPricePerUser)}.\n`+
+      `Users ${t.users} @ ${money(t.pricePerUser)}/seat; AI licenses ${t.aiLicenseCount} @ ${fmtUSD(t.aiPricePerUser)}/license.\n`+
       `AI snapshot: cost/question ${fmtUSD(d.costPerQuestion,4)}, provisioned ${d.provisionedQuestions} q/user, raw ${fmtUSD(d.rawApiCost)}, fully-loaded ${fmtUSD(d.fullyLoaded)}/user/mo; provisioning buffer ${snapAi.provisioningBuffer}x; budget headroom ${money(d.headroom)}.\n`+
       `Totals: implementation ${money(t.implementation)}, monthly ${money(t.monthly)} (AI ${money(t.aiMonthly)} + seats ${money(t.seatMonthly)} + bundle ${money(t.bundleMonthly)} + data ${money(t.dataMonthly)}), annual ${money(t.annual)}.`;
     try{const txt=await askAI("Explain how this quote's pricing was derived in 4-6 short sentences. Walk through the AI cost chain (cost per question → provisioned questions → fully-loaded per-user cost), then the monthly components. Flag any concern (e.g. negative budget headroom or a high provisioning buffer).",ctx);body.innerHTML=esc(txt).replace(/\n/g,"<br>");}
