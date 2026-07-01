@@ -555,6 +555,17 @@
   .clay-badge.ok{background:var(--ok-soft);color:var(--ok);}
   .clay-badge.warn{background:var(--warn-soft);color:var(--warn);}
 
+  /* ---------- quote builder — compact integration summary ---------- */
+  .qb-sum-ints{border-top:1px solid var(--line);padding-top:10px;}
+  .qb-sum-stats{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap;}
+  .qb-sum-stat{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;}
+  .qb-int-rows{max-height:none;}
+  .qb-int-row{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:3px 0;border-bottom:1px solid var(--line);font-size:11.5px;}
+  .qb-int-row:last-child{border-bottom:none;}
+  .qb-int-row-name{color:var(--ink);font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .qb-int-row-prices{display:flex;gap:5px;flex:none;color:var(--faint);white-space:nowrap;font-size:11px;}
+  .qb-int-row-prices b{color:var(--muted);font-weight:600;}
+
   /* ---------- quote builder — excel integration table ---------- */
   .qb-int-wrap{overflow:auto;max-height:380px;border:1px solid var(--line);border-radius:var(--r-sm);}
   .qb-int-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -1831,7 +1842,7 @@ function renderContactDetail(c,id){
     <button class="backlink" id="back">${I.back} Contacts</button>
     <div class="detail-head">
       <span class="ava big-ava" style="background:${colorFor(contactName(x))}">${esc(initials(contactName(x)))}</span>
-      <div style="flex:1"><h1>${esc(contactName(x))||"Unnamed"}</h1><div class="meta">${esc(x.title||"")}${co?` · <b>${esc(co.name)}</b>`:""}</div>
+      <div style="flex:1"><h1>${esc(contactName(x))||"Unnamed"}</h1><div class="meta">${esc(x.title||"")}${co?` · <a href="#" id="golinkco-head"><b>${esc(co.name)}</b></a>`:""}</div>
         <div style="margin-top:8px"><span class="chip"><span class="dot" style="background:${STATUS_COLOR[x.status]||"#94a3b8"}"></span>${esc(x.status||"Lead")}</span> ${(x.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div></div>
       <div style="display:flex;gap:8px"><button class="btn" id="edit">${I.edit}<span>Edit</span></button></div>
     </div>
@@ -1860,6 +1871,7 @@ function renderContactDetail(c,id){
   $("#loglinkedin").onclick=()=>noteForm("contact",id,"linkedin");
   $("#logcall").onclick=()=>noteForm("contact",id,"phone");
   const gl=$("#golinkco"); if(gl)gl.onclick=e=>{e.preventDefault();state.detail={type:"company",id:co.id};render();};
+  const glh=$("#golinkco-head"); if(glh)glh.onclick=e=>{e.preventDefault();state.detail={type:"company",id:co.id};render();};
   const setAI=html=>$("#ai-body").innerHTML=html;
   const runAI=async(label,task,extra)=>{ setAI(`<span class="spin"></span> ${label}…`);
     try{ const t=await askAI(task,`Focus on this contact: ${contactName(x)} (${x.title||""}) at ${co?.name||"no company"}, status ${x.status||"Lead"}, ${deals.length} related deal(s).`+(extra||"")); setAI(esc(t).replace(/\n/g,"<br>")); }
@@ -2925,7 +2937,7 @@ function renderSettings(c){
       </div>
     </div>
     <div class="card panel" style="margin-top:14px">
-      <div class="panel-head" ${sc("int-pricing")?'style="margin-bottom:0"':''}><h2>Integration Pricing</h2><div style="display:flex;gap:8px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · future quotes only</span><button class="btn sm" id="intprice-reset">${I.spark}Reset to defaults</button><button class="btn sm primary" id="addintprice">${I.plus}Add integration</button>${chv("int-pricing")}</div></div>
+      <div class="panel-head" ${sc("int-pricing")?'style="margin-bottom:0"':''}><h2>Integration Pricing</h2><div style="display:flex;gap:8px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · future quotes only</span><button class="btn sm primary" id="addintprice">${I.plus}Add integration</button>${chv("int-pricing")}</div></div>
       <div id="ss-int-pricing" ${sc("int-pricing")?'style="display:none"':''}>
 
       <div class="faint" style="font-size:12px;margin-bottom:12px">Implementation cost and monthly fee per platform. Auto-populated from defaults. Edit any row to override pricing for future quotes — saved quotes stay frozen.</div>
@@ -3435,9 +3447,10 @@ function wireDlines(){
 function dealForm(id,defaults={}){
   const x=id?state.deals.find(d=>d.id===id):defaults;
   const contactOpts=[{v:"",l:"— None —"},...live(state.contacts).map(c=>({v:c.id,l:contactName(c)}))];
-  const body=`${id&&x.createdAt?`<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Created ${fmtDate(x.createdAt)}${x.createdBy?" by "+esc(x.createdBy):""}</div>`:""}${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
-    <div class="field-row"><div class="field"><label>Value (USD)</label><div style="display:flex;gap:5px;margin-bottom:5px"><select class="input" id="d_quoteId" style="flex:1"><option value="">— Enter manually —</option>${live(state.quotes).map(q=>`<option value="${esc(q.id)}"${x.quoteId===q.id?" selected":""}>${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("")}</select><button type="button" class="btn ghost sm" id="d-new-quote" style="white-space:nowrap">${I.plus}New</button></div><input type="number" class="input" id="d_value" value="${x.value||0}" placeholder="0"${x.quoteId?" readonly":""} style="${x.quoteId?"background:var(--surface-2);color:var(--muted);":""}"><div id="d-val-hint" style="font-size:11px;color:var(--faint);margin-top:3px">${x.quoteId?"Auto-set from attached quote (annual value)":""}</div></div>${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:stageList()})}</div>
+  const body=`${id&&x.createdAt?`<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Created ${fmtDate(x.createdAt)}${x.createdBy?" by "+esc(x.createdBy):""}</div>`:""}
     <div class="field-row">${field("d_company","Company",{type:"select",value:x.companyId,options:companyOptions()})}${field("d_contact","Primary contact",{type:"select",value:x.contactId,options:contactOpts})}</div>
+    ${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
+    <div class="field-row"><div class="field"><label>Value (USD)</label><div style="display:flex;gap:5px;margin-bottom:5px"><select class="input" id="d_quoteId" style="flex:1"><option value="">— Enter manually —</option>${live(state.quotes).filter(q=>!x.companyId||q.companyId===x.companyId).map(q=>`<option value="${esc(q.id)}"${x.quoteId===q.id?" selected":""}>${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("")}</select><button type="button" class="btn ghost sm" id="d-new-quote" style="white-space:nowrap">${I.plus}New</button></div><input type="number" class="input" id="d_value" value="${x.value||0}" placeholder="0"${x.quoteId?" readonly":""} style="${x.quoteId?"background:var(--surface-2);color:var(--muted);":""}"><div id="d-val-hint" style="font-size:11px;color:var(--faint);margin-top:3px">${x.quoteId?"Auto-set from attached quote (annual value)":""}</div></div>${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:stageList()})}</div>
     <div class="field-row">${field("d_prio","Priority",{type:"select",value:x.priority||"medium",options:PRIORITIES})}${field("d_close","Expected close",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}</div>
     <div class="field-row">${field("d_renewal","Renewal date",{type:"date",value:x.renewalDate?new Date(x.renewalDate).toISOString().slice(0,10):""})}${field("d_source","Source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}</div>
     <div class="field-row">${field("d_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
@@ -3476,6 +3489,8 @@ function dealForm(id,defaults={}){
     if(qSel)qSel.onchange=()=>applyQuote(qSel.value);
     const dNQ=document.getElementById("d-new-quote");
     if(dNQ)dNQ.onclick=()=>{quoteBuilderModal({},null,(savedId)=>{if(!qSel)return;const opt=document.createElement("option");const q=state.quotes.find(z=>z.id===savedId);opt.value=savedId;opt.text=`${q?.name||(companyById(q?.companyId)?.name)||"Untitled"} · ${money(q?.totals?.annual||0)}/yr`;qSel.appendChild(opt);qSel.value=savedId;applyQuote(savedId);});};
+    const cmpSel=document.getElementById("d_company");
+    if(cmpSel)cmpSel.onchange=()=>{if(!qSel)return;const cid=cmpSel.value;const fq=live(state.quotes).filter(q=>!cid||q.companyId===cid);qSel.innerHTML='<option value="">— Enter manually —</option>'+fq.map(q=>`<option value="${esc(q.id)}">${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("");applyQuote("");};
     if(id){
       const out=()=>$("#d-ai");
       const run=async(label,task)=>{out().innerHTML=`<span class="spin"></span> ${label}…`;
@@ -3761,10 +3776,10 @@ function quoteBuilderModal(prefill,editId,onSaved){
         <div class="qb-section">
           <div class="qb-h">2 · Users &amp; AI</div>
           <div class="qb-inputs2" style="grid-template-columns:repeat(4,1fr)">
-            <div class="field" style="margin:0"><label>Number of Users</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??20}"></div>
-            <div class="field" style="margin:0"><label>Price Per User / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??25}"></div>
-            <div class="field" style="margin:0"><label>Number of AI Licenses</label><input id="qb-ai-users" type="number" min="0" step="1" value="${prefill?.users?.aiLicenseCount??prefill?.users?.count??20}"></div>
-            <div class="field" style="margin:0"><label>Amount Per AI License / mo ($)</label><input id="qb-ai-cost" type="number" min="0" step="0.01" value="${prefill?.aiCostOverride>0?prefill.aiCostOverride:(state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2))}"></div>
+            <div class="field" style="margin:0"><label>Number of Users</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??0}"></div>
+            <div class="field" style="margin:0"><label>Price Per User / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??0}"></div>
+            <div class="field" style="margin:0"><label>Number of AI Licenses</label><input id="qb-ai-users" type="number" min="0" step="1" value="${prefill?.users?.aiLicenseCount??prefill?.users?.count??0}"></div>
+            <div class="field" style="margin:0"><label>Amount Per AI License / mo ($)</label><input id="qb-ai-cost" type="number" min="0" step="0.01" value="${prefill?.aiCostOverride>0?prefill.aiCostOverride:(prefill?state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2):0)}"></div>
           </div>
           <div class="faint" style="font-size:11.5px;margin-top:4px">AI license count and amount default to Settings values. Edit either to override for this quote only.</div>
         </div>
@@ -3811,12 +3826,20 @@ function quoteBuilderModal(prefill,editId,onSaved){
   function summaryHtml(q,t){
     const line=(l,v,sub)=>`<div class="qb-line"><span>${l}${sub?`<span class="qb-line-sub">${sub}</span>`:""}</span><b>${v}</b></div>`;
     const headNeg=derived.headroom<0;
+    const intCount=q.integrations.length;
+    const intListHtml=intCount===0
+      ?`<div class="qb-line-sub" style="padding:4px 0;text-align:center">No integrations selected</div>`
+      :q.integrations.map(it=>{
+          const impl=it.quotedImplCost!=null?it.quotedImplCost:it.implCost;
+          const mo=it.quotedMonthlyCost!=null?it.quotedMonthlyCost:it.monthlyCost;
+          return `<div class="qb-int-row"><span class="qb-int-row-name">${esc(it.name)}</span><span class="qb-int-row-prices">${money(impl)} impl · <b>${money(mo)}/mo</b></span></div>`;
+        }).join("");
     return `
       <div class="qb-sum-h">Quote summary</div>
       <div class="qb-sum-block">
         <div class="qb-sum-lbl">Implementation (one-time)</div>
         <div class="qb-sum-big">${money(t.implementation)}</div>
-        <div class="qb-line-sub" style="margin-top:2px">${q.integrations.length} integration${q.integrations.length===1?"":"s"}${t.timelineDays?` · est. ${t.timelineDays} day timeline`:""}</div>
+        <div class="qb-line-sub" style="margin-top:2px">${intCount} integration${intCount===1?"":"s"}${t.timelineDays?` · est. ${t.timelineDays} day timeline`:""}</div>
       </div>
       <div class="qb-sum-block">
         <div class="qb-sum-lbl">Monthly subscription</div>
@@ -3831,6 +3854,15 @@ function quoteBuilderModal(prefill,editId,onSaved){
         <div class="qb-sum-big accent">${money(t.annual)}</div>
         <div class="qb-line-sub">${money(t.monthly)} × 12</div>
       </div>
+      <div class="qb-sum-block qb-sum-ints">
+        <div class="qb-sum-lbl" style="margin-bottom:6px">Selected integrations</div>
+        <div class="qb-sum-stats">
+          <span class="qb-sum-stat">${intCount} integration${intCount===1?"":"s"}</span>
+          <span class="qb-sum-stat">${t.users} seat${t.users===1?"":"s"}</span>
+          <span class="qb-sum-stat">${t.aiLicenseCount} AI license${t.aiLicenseCount===1?"":"s"}</span>
+        </div>
+        <div class="qb-int-rows">${intListHtml}</div>
+      </div>
       <div class="qb-sum-foot">
         <div class="qb-line-sub">${q.aiCostOverride>0&&q.aiCostOverride!==(state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2))?`AI cost/user: ${fmtUSD(q.aiCostOverride)} (per-quote override)`:state._aiCostPerUser>0?`AI cost/user: ${fmtUSD(state._aiCostPerUser)} (default from Settings — overrides computed ${fmtUSD(derived.fullyLoaded)})`:`AI cost basis: ${fmtUSD(derived.costPerQuestion,4)}/question · ${derived.provisionedQuestions} provisioned q/user · ${fmtUSD(derived.fullyLoaded)}/user fully-loaded`}</div>
         <div class="qb-line-sub" style="color:${headNeg?"var(--danger)":"var(--muted)"};margin-top:3px">${headNeg?"⚠️ ":""}Budget headroom: ${money(derived.headroom)} (${money(derived.expectedPooled)} expected vs ${money(ai.committedBudget)} committed)</div>
@@ -3842,6 +3874,7 @@ function quoteBuilderModal(prefill,editId,onSaved){
       const on=sel.has(tr.dataset.intId);
       tr.classList.toggle("on",on);
       const nm=tr.querySelector(".qb-int-name");if(nm)nm.style.fontWeight=on?600:400;
+      const cb=tr.querySelector(".qb-cb");if(cb)cb.checked=on;
     });
     const q=collect();const t=computeQuoteTotals(q);
     if(!bundleTouched){const be=overlay.querySelector("#qb-bundle");if(be)be.value=t.perIntegrationMonthly;}
