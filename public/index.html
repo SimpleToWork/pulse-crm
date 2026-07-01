@@ -244,6 +244,16 @@
   .xf-actions button{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:5px;padding:5px;font-size:12px;font-weight:500;cursor:pointer;}
   .xf-actions .xf-apply{background:var(--accent);border-color:var(--accent);color:#fff;}
   .xf-actions button:hover{filter:brightness(.97);}
+  .xf-note{font-size:10.5px;color:var(--faint);padding:5px 2px 0;line-height:1.4;}
+  /* ---------- table pagination ---------- */
+  .tpager{position:sticky;bottom:0;left:0;z-index:9;display:flex;align-items:center;gap:18px;padding:8px 14px;background:var(--surface);border-top:1px solid var(--line);font-size:12px;color:var(--muted);}
+  .tpager-ctl{display:flex;align-items:center;gap:6px;}
+  .tpager-btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:500;cursor:pointer;}
+  .tpager-btn:hover:not(:disabled){background:var(--surface-2);}
+  .tpager-btn:disabled{opacity:.4;cursor:default;}
+  .tpager-page{padding:0 4px;white-space:nowrap;}
+  .tpager-size{display:flex;align-items:center;gap:3px;}
+  .tpager-per{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:3px 5px;font-size:12px;cursor:pointer;}
 
   /* ---------- kanban ---------- */
   .board{display:grid;grid-auto-flow:column;grid-auto-columns:280px;gap:13px;overflow-x:auto;padding-bottom:12px;align-items:start;scrollbar-width:thin;}
@@ -782,6 +792,7 @@ const state={ page:"dashboard", detail:null, user:null,
   navCollapsed: localStorage.getItem("pulse-nav-collapsed")==="1",
   activityCollapsed: localStorage.getItem("pulse-activity-collapsed")==="1",
   _supTab:"categories",
+  _perPage:50, _cPage:1, _coPage:1, _dPage:1, _tPage:1, _tkPage:1,
   _cSort:{col:"",dir:"asc"}, _cXf:{},
   _coSort:{col:"",dir:"asc"}, _coXf:{},
   _tSort:{col:"due",dir:"asc"}, _tXf:{status:{picked:["Open"],cond:null}},
@@ -933,10 +944,9 @@ const XF_OPS={
   number:[["","Show all"],["eq","="],["ne","≠"],["gt",">"],["ge","≥"],["lt","<"],["le","≤"],["between","Between"]],
   date:[["","Show all"],["on","On"],["before","Before"],["after","After"],["between","Between"]]
 };
-function xf(id,type,dist,f){ // funnel button + Excel filter panel
-  f=f||{}; const picked=Array.isArray(f.picked)?f.picked:null; const cond=f.cond||{op:"",a:"",b:""};
+function xf(id,type,f){ // funnel button + Excel filter panel shell; value list is built lazily on open
+  f=f||{}; const cond=f.cond||{op:"",a:"",b:""};
   const ops=XF_OPS[type]||XF_OPS.text; const inpType=type==="date"?"date":type==="number"?"number":"text";
-  const rows=dist.map(d=>`<label class="xf-opt"><input type="checkbox" data-key="${esc(d.key)}"${picked===null||picked.includes(d.key)?" checked":""}><span>${esc(d.label)}</span></label>`).join("");
   return `<span class="th-fd xf${xfActive(f)?" active":""}" id="${id}" data-type="${type}">
     <span class="th-fd-btn" title="Filter">${I.filter}</span>
     <div class="th-fd-panel xf-panel">
@@ -946,45 +956,64 @@ function xf(id,type,dist,f){ // funnel button + Excel filter panel
         <input class="xf-b" type="${inpType}" value="${esc(cond.b||"")}" placeholder="and"${cond.op==="between"?"":' style="display:none"'}>
       </div>
       <input class="xf-search" placeholder="Search values…" autocomplete="off">
-      <div class="xf-list">
-        <label class="xf-opt xf-all"><input type="checkbox" class="xf-allcb"${picked===null?" checked":""}><span>(Select All)</span></label>
-        ${rows}
-      </div>
+      <div class="xf-list"><label class="xf-opt xf-all"><input type="checkbox" class="xf-allcb"><span>(Select All)</span></label><div class="xf-body"></div></div>
+      <div class="xf-note" style="display:none"></div>
       <div class="xf-actions"><button class="xf-clear" type="button">Clear</button><button class="xf-apply" type="button">Apply</button></div>
     </div></span>`;
 }
-function wireXf(id,onApply){
+const XF_CAP=300; // max value-checkboxes rendered at once (high-cardinality columns rely on search + conditions)
+function wireXf(id,opts){
   const el=document.getElementById(id); if(!el)return;
+  const {type,distinct,f,onApply}=opts;
   const btn=el.querySelector(".th-fd-btn"),panel=el.querySelector(".xf-panel");
   const opSel=el.querySelector(".xf-op"),aInp=el.querySelector(".xf-a"),bInp=el.querySelector(".xf-b");
-  const search=el.querySelector(".xf-search"),allCb=el.querySelector(".xf-allcb");
-  const opts=[...el.querySelectorAll(".xf-list .xf-opt:not(.xf-all)")];
-  const cbs=opts.map(o=>o.querySelector("input"));
-  const position=()=>{ // fixed-position so the scroll container (overflow:auto) can't clip it
-    const r=btn.getBoundingClientRect();
-    panel.style.position="fixed"; panel.style.right="auto";
-    const pw=panel.offsetWidth||214,ph=panel.offsetHeight||300;
-    let left=Math.min(r.right-pw,window.innerWidth-pw-8); left=Math.max(8,left);
-    let top=r.bottom+4; if(top+ph>window.innerHeight-8)top=Math.max(8,window.innerHeight-ph-8);
-    panel.style.left=left+"px"; panel.style.top=top+"px";
-  };
+  const search=el.querySelector(".xf-search"),allCb=el.querySelector(".xf-allcb"),body=el.querySelector(".xf-body"),note=el.querySelector(".xf-note");
+  let all=null,total=0,sel=(f&&Array.isArray(f.picked))?new Set(f.picked):null; // sel=null → all selected
+  const position=()=>{const r=btn.getBoundingClientRect();panel.style.position="fixed";panel.style.right="auto";const pw=panel.offsetWidth||214,ph=panel.offsetHeight||320;let left=Math.min(r.right-pw,window.innerWidth-pw-8);left=Math.max(8,left);let top=r.bottom+4;if(top+ph>window.innerHeight-8)top=Math.max(8,window.innerHeight-ph-8);panel.style.left=left+"px";panel.style.top=top+"px";};
   const syncCond=()=>{const op=opSel.value;aInp.style.display=op?"":"none";bInp.style.display=op==="between"?"":"none";};
-  const syncAll=()=>{allCb.checked=cbs.every(cb=>cb.checked);allCb.indeterminate=!allCb.checked&&cbs.some(cb=>cb.checked);};
-  btn.onclick=e=>{e.stopPropagation();const open=el.classList.contains("open");document.querySelectorAll(".th-fd.open,.sdd.open").forEach(x=>x.classList.remove("open"));if(!open){el.classList.add("open");position();syncCond();syncAll();setTimeout(()=>search.focus(),0);}};
+  const syncAll=()=>{const n=sel===null?total:sel.size;allCb.checked=total>0&&n>=total;allCb.indeterminate=n>0&&n<total;};
+  const renderList=()=>{
+    const q=search.value.toLowerCase();
+    const items=q?all.filter(d=>d.label.toLowerCase().includes(q)):all;
+    const shown=items.slice(0,XF_CAP);
+    body.innerHTML=shown.map(d=>`<label class="xf-opt"><input type="checkbox" data-key="${esc(d.key)}"${(sel===null||sel.has(d.key))?" checked":""}><span>${esc(d.label)}</span></label>`).join("");
+    if(items.length>XF_CAP){note.style.display="";note.textContent=`Showing ${XF_CAP} of ${items.length} — refine search or use the condition above.`;}else note.style.display="none";
+    body.querySelectorAll("input").forEach(cb=>cb.onchange=()=>{if(sel===null)sel=new Set(all.map(d=>d.key));if(cb.checked)sel.add(cb.dataset.key);else sel.delete(cb.dataset.key);syncAll();});
+    syncAll();
+  };
+  const build=()=>{if(all)return;all=distinct()||[];total=all.length;renderList();};
+  btn.onclick=e=>{e.stopPropagation();const open=el.classList.contains("open");document.querySelectorAll(".th-fd.open,.sdd.open").forEach(x=>x.classList.remove("open"));if(!open){build();el.classList.add("open");position();syncCond();setTimeout(()=>search.focus(),0);}};
   panel.onclick=e=>e.stopPropagation();
   opSel.onchange=syncCond;
-  search.oninput=()=>{const q=search.value.toLowerCase();opts.forEach(o=>o.style.display=(!q||o.textContent.toLowerCase().includes(q))?"":"none");};
-  allCb.onchange=()=>{const on=allCb.checked;opts.forEach((o,i)=>{if(o.style.display!=="none")cbs[i].checked=on;});syncAll();};
-  cbs.forEach(cb=>cb.onchange=syncAll);
-  const apply=()=>{
-    const checked=cbs.filter(cb=>cb.checked).map(cb=>cb.dataset.key);
-    const picked=checked.length===cbs.length?null:checked;
-    const op=opSel.value,cond=op?{op,a:aInp.value,b:bInp.value}:null;
-    el.classList.remove("open"); onApply({picked,cond});
-  };
+  search.oninput=renderList;
+  allCb.onchange=()=>{sel=allCb.checked?null:new Set();allCb.indeterminate=false;renderList();};
+  const apply=()=>{const picked=(sel===null||sel.size>=total)?null:[...sel];const op=opSel.value,cond=op?{op,a:aInp.value,b:bInp.value}:null;el.classList.remove("open");onApply({picked,cond});};
   el.querySelector(".xf-apply").onclick=e=>{e.stopPropagation();apply();};
   el.querySelector(".xf-clear").onclick=e=>{e.stopPropagation();el.classList.remove("open");onApply({picked:null,cond:null});};
-  panel.querySelectorAll("input").forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();apply();}else if(e.key==="Escape")el.classList.remove("open");}));
+  panel.querySelectorAll("input,select").forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();apply();}else if(e.key==="Escape")el.classList.remove("open");}));
+}
+/* ---- table pagination ---- */
+function pagerBar(total,page,per){
+  const pages=per?Math.max(1,Math.ceil(total/per)):1;
+  const from=total?(per?(page-1)*per+1:1):0, to=per?Math.min(page*per,total):total;
+  return `<div class="tpager">
+    <div class="tpager-info">${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}</div>
+    <div class="tpager-ctl">
+      <label class="tpager-size">Rows<select class="tpager-per">${[25,50,100,200,0].map(n=>`<option value="${n}"${n===per?" selected":""}>${n||"All"}</option>`).join("")}</select></label>
+      <button class="tpager-btn" data-pg="prev"${page<=1?" disabled":""}>‹ Prev</button>
+      <span class="tpager-page">${page} / ${pages}</span>
+      <button class="tpager-btn" data-pg="next"${page>=pages?" disabled":""}>Next ›</button>
+    </div></div>`;
+}
+function pageSlice(rows,pageKey){ // clamps state[pageKey], returns the current page's rows
+  const per=state._perPage,pages=per?Math.max(1,Math.ceil(rows.length/per)):1;
+  const page=Math.min(Math.max(1,state[pageKey]||1),pages); state[pageKey]=page;
+  return {page,per,rows:per?rows.slice((page-1)*per,page*per):rows};
+}
+function wirePager(root,total,pageKey,draw){
+  const per=state._perPage,pages=per?Math.max(1,Math.ceil(total/per)):1;
+  root.querySelectorAll(".tpager-btn").forEach(b=>b.onclick=e=>{e.stopPropagation();const p=state[pageKey]||1;state[pageKey]=b.dataset.pg==="prev"?Math.max(1,p-1):Math.min(pages,p+1);draw();});
+  const s=root.querySelector(".tpager-per");if(s){s.onclick=e=>e.stopPropagation();s.onchange=()=>{state._perPage=+s.value;state[pageKey]=1;draw();};}
 }
 function tfStart(tf){
   const now=Date.now(), d=new Date(); d.setHours(0,0,0,0);
@@ -1930,14 +1959,15 @@ function renderContacts(c){
       else{av=a.updatedAt||0;bv=b.updatedAt||0;}
       return sd==="asc"?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
     });}else{rows.sort((a,b)=>b.updatedAt-a.updatedAt);}
-    const setSort=col=>{if(state._cSort.col===col)state._cSort.dir=state._cSort.dir==="asc"?"desc":"asc";else{state._cSort.col=col;state._cSort.dir="asc";}draw();};
+    const setSort=col=>{if(state._cSort.col===col)state._cSort.dir=state._cSort.dir==="asc"?"desc":"asc";else{state._cSort.col=col;state._cSort.dir="asc";}state._cPage=1;draw();};
+    const pg=pageSlice(rows,"_cPage");
     $("#ctable").innerHTML=rows.length?`<table><thead>
       <tr>
-        ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-"+col.k,col.type,xfDistinct(list,col.get,col.type),xfs[col.k])}</th>`).join("")}
+        ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
         <th></th>
       </tr>
       </thead><tbody>
-      ${rows.map(x=>`<tr data-id="${x.id}">
+      ${pg.rows.map(x=>`<tr data-id="${x.id}">
         <td><div class="cellname">${ava(contactName(x),28)}<div><div>${esc(contactName(x))||"—"}</div><div class="faint" style="font-size:11.5px">${esc(x.title||"")}</div></div></div></td>
         <td>${esc(companyById(x.companyId)?.name||"—")}</td>
         <td class="muted">${esc(x.email||"—")}</td>
@@ -1946,9 +1976,10 @@ function renderContacts(c){
         <td class="muted">${x.lastContacted?fmtDate(x.lastContacted):'<span class="faint">Never</span>'}</td>
         <td class="muted" style="font-size:12px">${x.createdBy?esc(x.createdBy):'<span class="faint">—</span>'}</td>
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td></tr>`).join("")}
-      </tbody></table>`:emptyState("users","No contacts yet","Add your first contact to start building your pipeline.","New contact","newc2");
+      </tbody></table>${pagerBar(rows.length,pg.page,pg.per)}`:emptyState("users","No contacts yet","Add your first contact to start building your pipeline.","New contact","newc2");
     $("#ctable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
-    COLS.forEach(col=>wireXf("cf-"+col.k,f=>{state._cXf[col.k]=f;draw();}));
+    wirePager($("#ctable"),rows.length,"_cPage",draw);
+    COLS.forEach(col=>wireXf("cf-"+col.k,{type:col.type,distinct:()=>xfDistinct(list,col.get,col.type),f:xfs[col.k],onApply:f=>{state._cXf[col.k]=f;state._cPage=1;draw();}}));
     $("#ctable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{ if(e.target.closest("[data-edit]"))return; state.detail={type:"contact",id:tr.dataset.id};render(); });
     $("#ctable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();contactForm(b.dataset.edit);});
     const n2=$("#newc2"); if(n2)n2.onclick=()=>contactForm();
@@ -2043,22 +2074,24 @@ function renderCompanies(c){
       else{av=a.updatedAt||0;bv=b.updatedAt||0;}
       return sd==="asc"?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
     });}else{rows.sort((a,b)=>b.updatedAt-a.updatedAt);}
-    const setSort=col=>{if(state._coSort.col===col)state._coSort.dir=state._coSort.dir==="asc"?"desc":"asc";else{state._coSort.col=col;state._coSort.dir="asc";}draw();};
+    const setSort=col=>{if(state._coSort.col===col)state._coSort.dir=state._coSort.dir==="asc"?"desc":"asc";else{state._coSort.col=col;state._coSort.dir="asc";}state._coPage=1;draw();};
+    const pg=pageSlice(rows,"_coPage");
     $("#cotable").innerHTML=rows.length?`<table><thead>
       <tr>
-        ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-co-"+col.k,col.type,xfDistinct(list,col.get,col.type),xfs[col.k])}</th>`).join("")}
+        ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-co-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
         <th></th>
       </tr>
       </thead><tbody>
-      ${rows.map(x=>{const cts=live(state.contacts).filter(c2=>c2.companyId===x.id).length;const dl=live(state.deals).filter(d=>d.companyId===x.id&&d.stage!=="Won"&&d.stage!=="Lost");
+      ${pg.rows.map(x=>{const cts=live(state.contacts).filter(c2=>c2.companyId===x.id).length;const dl=live(state.deals).filter(d=>d.companyId===x.id&&d.stage!=="Won"&&d.stage!=="Lost");
         return `<tr data-id="${x.id}"><td><div class="cellname"><span class="ava" style="width:28px;height:28px;border-radius:8px;background:${colorFor(x.name)}">${esc(initials(x.name))}</span>${esc(x.name)}</div></td>
         <td class="muted">${esc(x.industry||"—")}</td><td class="muted">${esc(x.size||"—")}</td><td>${cts}</td>
         <td>${dl.length} · ${moneyK(dl.reduce((s,d)=>s+(+d.value||0),0))}</td><td>${x.owner?ava(x.owner,24):'<span class="faint">—</span>'}</td>
         <td class="muted" style="font-size:12px">${x.createdBy?esc(x.createdBy):'<span class="faint">—</span>'}</td>
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td></tr>`;}).join("")}
-      </tbody></table>`:emptyState("building","No companies yet","Add companies to group contacts and deals.","New company","newco2");
+      </tbody></table>${pagerBar(rows.length,pg.page,pg.per)}`:emptyState("building","No companies yet","Add companies to group contacts and deals.","New company","newco2");
     $("#cotable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
-    COLS.forEach(col=>wireXf("cf-co-"+col.k,f=>{state._coXf[col.k]=f;draw();}));
+    wirePager($("#cotable"),rows.length,"_coPage",draw);
+    COLS.forEach(col=>wireXf("cf-co-"+col.k,{type:col.type,distinct:()=>xfDistinct(list,col.get,col.type),f:xfs[col.k],onApply:f=>{state._coXf[col.k]=f;state._coPage=1;draw();}}));
     $("#cotable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"company",id:tr.dataset.id};render();});
     $("#cotable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();companyForm(b.dataset.edit);});
     const n2=$("#newco2");if(n2)n2.onclick=()=>companyForm();
@@ -2184,11 +2217,12 @@ function renderDeals(c){
         else{av=a.updatedAt||0;bv=b.updatedAt||0;}
         return sd==="asc"?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
       });}else{rows.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));}
-      const setSort=col=>{if(state._dSort.col===col)state._dSort.dir=state._dSort.dir==="asc"?"desc":"asc";else{state._dSort.col=col;state._dSort.dir="asc";}draw();};
+      const setSort=col=>{if(state._dSort.col===col)state._dSort.dir=state._dSort.dir==="asc"?"desc":"asc";else{state._dSort.col=col;state._dSort.dir="asc";}state._dPage=1;draw();};
+      const pg=pageSlice(rows,"_dPage");
       $("#dtable").innerHTML=rows.length?`<table><thead><tr>
-          ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("dxf-"+col.k,col.type,xfDistinct(D,col.get,col.type),xfs[col.k])}</th>`).join("")}
+          ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("dxf-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
           <th></th></tr></thead><tbody>
-          ${rows.map(d=>`<tr data-id="${d.id}">
+          ${pg.rows.map(d=>`<tr data-id="${d.id}">
             <td><div style="font-weight:600;font-size:13px">${esc(d.name)}</div></td>
             <td>${esc(companyById(d.companyId)?.name||"—")}</td>
             <td><span class="chip"><span class="dot" style="background:${stageColor(d.stage)}"></span>${esc(d.stage)}</span></td>
@@ -2200,12 +2234,13 @@ function renderDeals(c){
             <td class="muted" style="font-size:12px">${d.createdAt?fmtDate(d.createdAt):'<span class="faint">—</span>'}</td>
             <td><div class="rowact"><button class="btn ghost sm" data-edit="${d.id}">${I.edit}</button></div></td>
             </tr>`).join("")}
-          </tbody></table>`:emptyState("trello","No deals match","Adjust your filters or add a new deal.","New deal","newd2");
+          </tbody></table>${pagerBar(rows.length,pg.page,pg.per)}`:emptyState("trello","No deals match","Adjust your filters or add a new deal.","New deal","newd2");
       $("#dtable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
+      wirePager($("#dtable"),rows.length,"_dPage",draw);
       $("#dtable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;dealForm(tr.dataset.id);});
       $("#dtable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();dealForm(b.dataset.edit);});
       const n2=$("#newd2");if(n2)n2.onclick=()=>dealForm();
-      COLS.forEach(col=>wireXf("dxf-"+col.k,f=>{state._dXf[col.k]=f;draw();}));
+      COLS.forEach(col=>wireXf("dxf-"+col.k,{type:col.type,distinct:()=>xfDistinct(D,col.get,col.type),f:xfs[col.k],onApply:f=>{state._dXf[col.k]=f;state._dPage=1;draw();}}));
     };
     draw();
   } else {
@@ -2320,16 +2355,17 @@ function renderTasks(c){
       else{av=a.due||9e15;bv=b.due||9e15;}
       return sd==="asc"?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
     });
-    const setSort=col=>{if(state._tSort.col===col)state._tSort.dir=state._tSort.dir==="asc"?"desc":"asc";else{state._tSort.col=col;state._tSort.dir="asc";}draw();};
+    const setSort=col=>{if(state._tSort.col===col)state._tSort.dir=state._tSort.dir==="asc"?"desc":"asc";else{state._tSort.col=col;state._tSort.dir="asc";}state._tPage=1;draw();};
+    const pg=pageSlice(rows,"_tPage");
     $("#ttable").innerHTML=rows.length?`<table><thead>
       <tr>
         ${COLS.map(col=>col.sort===false
-          ?`<th${col.w?` style="width:${col.w}"`:""}>${xf("cf-t-"+col.k,col.type,xfDistinct(T,col.get,col.type),xfs[col.k])}</th>`
-          :`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-t-"+col.k,col.type,xfDistinct(T,col.get,col.type),xfs[col.k])}</th>`).join("")}
+          ?`<th${col.w?` style="width:${col.w}"`:""}>${xf("cf-t-"+col.k,col.type,xfs[col.k])}</th>`
+          :`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-t-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
         <th></th>
       </tr>
       </thead><tbody>
-      ${rows.map(t=>{const rel=relLabel(t);const od=t.status!=="done"&&isOverdue(t.due);
+      ${pg.rows.map(t=>{const rel=relLabel(t);const od=t.status!=="done"&&isOverdue(t.due);
         return `<tr data-id="${t.id}"><td style="width:40px"><input type="checkbox" data-done="${t.id}" ${t.status==="done"?"checked":""} style="width:18px;height:18px;cursor:pointer;accent-color:var(--accent)"></td>
         <td><div style="font-weight:500;${t.status==="done"?"text-decoration:line-through;color:var(--faint)":""}">${esc(t.title)}</div>${rel?`<div class="faint" style="font-size:11.5px">${esc(rel)}</div>`:""}</td>
         <td><span class="prio ${t.priority||"low"}">${esc(t.priority||"low")}</span></td>
@@ -2337,9 +2373,10 @@ function renderTasks(c){
         <td>${t.owner?ava(t.owner,24):""}</td>
         <td class="muted" style="font-size:12px">${t.createdBy?esc(t.createdBy):'<span class="faint">—</span>'}</td>
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${t.id}">${I.edit}</button></div></td></tr>`;}).join("")}
-      </tbody></table>`:emptyState("check","Nothing here","You're all caught up for this view.","New task","newt2");
+      </tbody></table>${pagerBar(rows.length,pg.page,pg.per)}`:emptyState("check","Nothing here","You're all caught up for this view.","New task","newt2");
     $("#ttable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
-    COLS.forEach(col=>wireXf("cf-t-"+col.k,f=>{state._tXf[col.k]=f;draw();}));
+    wirePager($("#ttable"),rows.length,"_tPage",draw);
+    COLS.forEach(col=>wireXf("cf-t-"+col.k,{type:col.type,distinct:()=>xfDistinct(T,col.get,col.type),f:xfs[col.k],onApply:f=>{state._tXf[col.k]=f;state._tPage=1;draw();}}));
     $("#ttable").querySelectorAll("[data-done]").forEach(cb=>cb.onclick=e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===cb.dataset.done);
       dbUpdate("tasks",cb.dataset.done,{status:cb.checked?"done":"open"},true); if(cb.checked)logActivity("task",`Completed task "${t?.title||""}"`,t?.relatedType,t?.relatedId); draw();});
     $("#ttable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();taskForm(b.dataset.edit);});
@@ -2399,8 +2436,9 @@ function renderTickets(c){
       else{av=a.createdAt||0;bv=b.createdAt||0;}
       return sd==="asc"?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
     });}else{rows.sort((a,b)=>b.createdAt-a.createdAt);}
-    const setSort=col=>{if(state._tkSort.col===col)state._tkSort.dir=state._tkSort.dir==="asc"?"desc":"asc";else{state._tkSort.col=col;state._tkSort.dir="asc";}draw();};
-    const tbody=rows.map(x=>{
+    const setSort=col=>{if(state._tkSort.col===col)state._tkSort.dir=state._tkSort.dir==="asc"?"desc":"asc";else{state._tkSort.col=col;state._tkSort.dir="asc";}state._tkPage=1;draw();};
+    const pg=pageSlice(rows,"_tkPage");
+    const tbody=pg.rows.map(x=>{
       const co=companyById(x.companyId),ct=x.contactId?contactById(x.contactId):null;
       const sla=slaStatus(x);
       return `<tr data-id="${x.id}">
@@ -2418,15 +2456,16 @@ function renderTickets(c){
     $("#tktable").innerHTML=rows.length?`<table><thead>
       <tr>
         ${COLS.map(col=>col.sort===false
-          ?`<th>${esc(col.label)}${xf("tk-"+col.k,col.type,xfDistinct(list,col.get,col.type),xfs[col.k])}</th>`
-          :`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("tk-"+col.k,col.type,xfDistinct(list,col.get,col.type),xfs[col.k])}</th>`).join("")}
+          ?`<th>${esc(col.label)}${xf("tk-"+col.k,col.type,xfs[col.k])}</th>`
+          :`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("tk-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
         <th></th>
-      </tr></thead><tbody>${tbody}</tbody></table>`:emptyState("ticket","No tickets yet","Create your first support ticket to start tracking customer issues.","New ticket","newtk2");
+      </tr></thead><tbody>${tbody}</tbody></table>${pagerBar(rows.length,pg.page,pg.per)}`:emptyState("ticket","No tickets yet","Create your first support ticket to start tracking customer issues.","New ticket","newtk2");
     $("#tktable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
+    wirePager($("#tktable"),rows.length,"_tkPage",draw);
     $("#tktable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();ticketForm(b.dataset.edit);});
     $("#tktable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"ticket",id:tr.dataset.id};render();});
     const n2=$("#newtk2");if(n2)n2.onclick=()=>ticketForm();
-    COLS.forEach(col=>wireXf("tk-"+col.k,f=>{state._tkXf[col.k]=f;draw();}));
+    COLS.forEach(col=>wireXf("tk-"+col.k,{type:col.type,distinct:()=>xfDistinct(list,col.get,col.type),f:xfs[col.k],onApply:f=>{state._tkXf[col.k]=f;state._tkPage=1;draw();}}));
   };
   $("#newtk").onclick=()=>ticketForm();draw();
 }
