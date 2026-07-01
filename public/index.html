@@ -178,9 +178,12 @@
   .field-search input:focus{outline:none;}
   .field-search svg{width:15px;height:15px;color:var(--faint);flex:none;}
   table{width:100%;border-collapse:collapse;}
-  .tablecard{overflow:clip;}
+  /* Own scroll region: wide tables scroll horizontally instead of clipping,
+     and the header stays pinned to the top of the card (works with the scroll
+     container, unlike page-level sticky which needs a non-scrolling ancestor). */
+  .tablecard{overflow:auto;max-height:max(240px,calc(100vh - var(--topbar-h,64px) - var(--page-top-h,0px) - 62px));}
   thead th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600;text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);background:var(--surface-2);white-space:nowrap;}
-  .tablecard thead th{position:sticky;top:calc(var(--topbar-h) + var(--page-top-h,0px));z-index:10;}
+  .tablecard thead th{position:sticky;top:0;z-index:10;}
   tbody td{padding:12px 16px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle;}
   tbody tr:last-child td{border-bottom:none;}
   tbody tr{cursor:pointer;transition:background .1s;}
