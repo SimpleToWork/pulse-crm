@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Tasks" />; }
+import TasksView from "@/components/views/TasksView";
+export default function Page() { return <TasksView />; }
