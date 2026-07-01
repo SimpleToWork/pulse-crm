@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Templates" />; }
+import TemplatesView from "@/components/views/TemplatesView";
+export default function Page() { return <TemplatesView />; }

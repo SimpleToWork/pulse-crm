@@ -1,2 +1,2 @@
-import Stub from "@/components/Stub";
-export default function Page() { return <Stub name="Settings" />; }
+import SettingsView from "@/components/views/SettingsView";
+export default function Page() { return <SettingsView />; }

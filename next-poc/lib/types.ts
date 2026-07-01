@@ -77,6 +77,19 @@ export interface Ticket {
   deletedAt?: number | null;
 }
 
+export const TMPL_CATS = ["Welcome Email", "Proposal", "Meeting Recap", "Next Steps", "Follow-Up", "Other"] as const;
+
+export interface Template {
+  id: string;
+  name: string;
+  category?: string;
+  subject?: string;
+  body?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  deletedAt?: number | null;
+}
+
 export type ColType = "text" | "number" | "date";
 
 /** One column's filter: a value checklist (picked=null → all) plus an optional condition. */

@@ -6,7 +6,7 @@ import { makeDemo } from "@/lib/demoData";
 
 const ALLOWED_DOMAIN = "merchantsbi.com";
 // Collections streamed into the store. Extend as views are migrated.
-const COLLECTIONS = ["contacts", "companies", "deals", "tasks", "tickets"];
+const COLLECTIONS = ["contacts", "companies", "deals", "tasks", "tickets", "templates"];
 
 /**
  * App-wide client providers: applies theme, runs auth (Firebase or demo), and
@@ -42,6 +42,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       setCollection("deals", d.deals);
       setCollection("tasks", d.tasks);
       setCollection("tickets", d.tickets);
+      setCollection("templates", d.templates);
       return;
     }
     let unsub: Array<() => void> = [];

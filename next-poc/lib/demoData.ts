@@ -1,5 +1,16 @@
-import type { Contact, Company, Deal, Task, Ticket } from "./types";
+import type { Contact, Company, Deal, Task, Ticket, Template } from "./types";
 import { STAGES, PRIORITIES } from "./types";
+
+const TEMPLATES: Template[] = [
+  { id: "tm1", name: "Intro outreach", category: "Welcome Email", subject: "Great connecting", body: "Hi {{firstName}},\n\nThanks for taking the time today. Here's a quick recap of how PulseCRM can help {{company}}…\n\nBest,\n{{me}}" },
+  { id: "tm2", name: "Proposal cover", category: "Proposal", subject: "Your proposal", body: "Hi {{firstName}},\n\nAttached is the proposal we discussed. Highlights:\n• …\n• …\n\nHappy to walk through it live." },
+  { id: "tm3", name: "Post-call recap", category: "Meeting Recap", body: "Thanks for the call! Recap:\n• Goals: …\n• Next steps: …\n• Timeline: …" },
+  { id: "tm4", name: "Next steps", category: "Next Steps", body: "Hi {{firstName}}, to move forward:\n1. …\n2. …\nLet me know if that works." },
+  { id: "tm5", name: "Gentle follow-up", category: "Follow-Up", subject: "Circling back", body: "Hi {{firstName}}, just floating this back to the top of your inbox — any thoughts?" },
+  { id: "tm6", name: "Renewal reminder", category: "Follow-Up", body: "Hi {{firstName}}, your renewal is coming up on {{date}}. Let's find time to review results." },
+  { id: "tm7", name: "Onboarding welcome", category: "Welcome Email", body: "Welcome aboard, {{firstName}}! Here's how to get started with your team…" },
+  { id: "tm8", name: "Lost deal check-in", category: "Other", body: "Hi {{firstName}}, no worries on the timing — I'll check back next quarter. Door's always open." },
+];
 
 const FIRST = ["Sarah","Emma","Mia","Tom","Liam","Noah","Olivia","Ava","Ethan","Sophia","Jack","Isla","Leo","Aria","Max","Zoe","Owen","Ruby","Finn","Nora","Cole","Ivy","Reid","Jade","Blake","Luna","Chase","Elle","Dean","Faye"];
 const LAST = ["Chen","Rossi","Okafor","Nguyen","Park","Silva","Kane","Reyes","Haddad","Novak","Berg","Malik","Costa","Frost","Vance","Ito","Roy","Bauer","Cruz","Wolfe","Dunn","Shah","Lund","Pena","Voss"];
@@ -18,7 +29,7 @@ const TASK_TITLES = ["Follow up call","Send proposal","Schedule demo","Review co
 function rng(seed: number) { let s = seed; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 const pick = <T,>(r: () => number, arr: T[]) => arr[Math.floor(r() * arr.length)];
 
-export interface DemoData { contacts: Contact[]; companies: Company[]; deals: Deal[]; tasks: Task[]; tickets: Ticket[]; }
+export interface DemoData { contacts: Contact[]; companies: Company[]; deals: Deal[]; tasks: Task[]; tickets: Ticket[]; templates: Template[]; }
 
 export function makeDemo(n = 500): DemoData {
   const r = rng(42);
@@ -75,5 +86,7 @@ export function makeDemo(n = 500): DemoData {
     });
   }
 
-  return { contacts, companies, deals, tasks, tickets };
+  const now2 = now;
+  const templates: Template[] = TEMPLATES.map((t) => ({ ...t, createdAt: now2, updatedAt: now2, deletedAt: null }));
+  return { contacts, companies, deals, tasks, tickets, templates };
 }

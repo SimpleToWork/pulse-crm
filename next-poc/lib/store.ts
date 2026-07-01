@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import type { Contact, Company, Deal, Task, Ticket } from "./types";
+import type { Contact, Company, Deal, Task, Ticket, Template } from "./types";
 
 export interface User { name: string; email: string; uid?: string; }
 export type Theme = "light" | "dark";
@@ -42,3 +42,5 @@ export const useLiveCompanies = () => live(useCompaniesData());
 export const useLiveDeals = () => live(useDealsData());
 export const useLiveTasks = () => live(useTasksData());
 export const useLiveTickets = () => live(useTicketsData());
+export const useTemplatesData = () => useStore((s) => (s.collections.templates as Template[]) || []);
+export const useLiveTemplates = () => live(useTemplatesData());
