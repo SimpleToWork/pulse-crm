@@ -833,6 +833,9 @@ const state={ page:"dashboard", detail:null, user:null,
   _settingsSections: JSON.parse(localStorage.getItem("pulse-settings-sections")||"{}") };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
+// One-to-one quote↔deal binding: returns the live deal a quote is already attached to
+// (excluding `exceptDealId`, the deal currently being edited), or null if the quote is free to use.
+function dealForQuote(quoteId,exceptDealId){if(!quoteId)return null;return live(state.deals).find(d=>d.quoteId===quoteId&&d.id!==exceptDealId)||null;}
 
 /* dynamic stage helpers — fall back to compile-time constants when no custom stages are saved */
 function stageList(){const ps=live(state.pipelineStages);if(!ps.length)return STAGES;return[...ps].sort((a,b)=>(a.order||0)-(b.order||0)).map(s=>s.name);}
@@ -3664,7 +3667,7 @@ function dealForm(id,defaults={}){
   const body=`${id&&x.createdAt?`<div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Created ${fmtDate(x.createdAt)}${x.createdBy?" by "+esc(x.createdBy):""}</div>`:""}
     <div class="field-row">${field("d_company","Company",{type:"select",value:x.companyId,options:companyOptions()})}${field("d_contact","Primary contact",{type:"select",value:x.contactId,options:contactOpts})}</div>
     ${field("d_name","Deal name",{value:x.name,ph:"e.g. Acme — Annual plan"})}
-    <div class="field-row"><div class="field"><label>Value (USD)</label><div style="display:flex;gap:5px;margin-bottom:5px"><select class="input" id="d_quoteId" style="flex:1"><option value="">— Enter manually —</option>${live(state.quotes).filter(q=>!x.companyId||q.companyId===x.companyId).map(q=>`<option value="${esc(q.id)}"${x.quoteId===q.id?" selected":""}>${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("")}</select><button type="button" class="btn ghost sm" id="d-new-quote" style="white-space:nowrap">${I.plus}New</button></div><input type="number" class="input" id="d_value" value="${x.value||0}" placeholder="0"${x.quoteId?" readonly":""} style="${x.quoteId?"background:var(--surface-2);color:var(--muted);":""}"><div id="d-val-hint" style="font-size:11px;color:var(--faint);margin-top:3px">${x.quoteId?"Auto-set from attached quote (annual value)":""}</div></div>${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:stageList()})}</div>
+    <div class="field-row"><div class="field"><label>Value (USD)</label><div style="display:flex;gap:5px;margin-bottom:5px"><select class="input" id="d_quoteId" style="flex:1"><option value="">— Enter manually —</option>${live(state.quotes).filter(q=>(!x.companyId||q.companyId===x.companyId)&&(q.id===x.quoteId||!dealForQuote(q.id,id))).map(q=>`<option value="${esc(q.id)}"${x.quoteId===q.id?" selected":""}>${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("")}</select><button type="button" class="btn ghost sm" id="d-new-quote" style="white-space:nowrap">${I.plus}New</button></div><input type="number" class="input" id="d_value" value="${x.value||0}" placeholder="0"${x.quoteId?" readonly":""} style="${x.quoteId?"background:var(--surface-2);color:var(--muted);":""}"><div id="d-val-hint" style="font-size:11px;color:var(--faint);margin-top:3px">${x.quoteId?"Auto-set from attached quote (annual value)":""}</div></div>${field("d_stage","Stage",{type:"select",value:x.stage||"New Lead",options:stageList()})}</div>
     <div class="field-row">${field("d_prio","Priority",{type:"select",value:x.priority||"medium",options:PRIORITIES})}${field("d_close","Expected close",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}</div>
     <div class="field-row">${field("d_renewal","Renewal date",{type:"date",value:x.renewalDate?new Date(x.renewalDate).toISOString().slice(0,10):""})}${field("d_source","Source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}</div>
     <div class="field-row">${field("d_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
@@ -3683,6 +3686,7 @@ function dealForm(id,defaults={}){
       expectedClose:val("d_close")?new Date(val("d_close")).getTime():null,
       renewalDate:val("d_renewal")?new Date(val("d_renewal")).getTime():null};
     if(!data.name){toast("Deal name is required","err");return false;}
+    if(data.quoteId){const bound=dealForQuote(data.quoteId,id);if(bound){toast(`That quote is already attached to deal "${bound.name||"Untitled"}"`,"err");return false;}}
     if(id){const old=state.deals.find(d=>d.id===id);if((stage==="Won"||stage==="Lost")&&old?.stage!==stage)data.closedAt=Date.now();await dbUpdate("deals",id,data);if(old&&old.stage!==stage){logActivity("stage",`Deal "${data.name}" moved ${old.stage} → ${stage}`,"deal",id);notifySlack(`:arrows_counterclockwise: *Deal stage changed*: "${data.name}" moved from *${old.stage}* → *${stage}* (${money(data.value)})`);}}
     else{if(stage==="Won"||stage==="Lost")data.closedAt=Date.now();const nid=await dbAdd("deals",data);logActivity("deal",`Created deal "${data.name}" (${money(data.value)})`,"deal",nid);notifySlack(`:tada: *New deal created*: "${data.name}" — ${money(data.value)} · Stage: ${stage}${data.owner?" · Owner: "+data.owner:""}`);}
   });
@@ -3704,7 +3708,7 @@ function dealForm(id,defaults={}){
     const dNQ=document.getElementById("d-new-quote");
     if(dNQ)dNQ.onclick=()=>{quoteBuilderModal({},null,(savedId)=>{if(!qSel)return;const opt=document.createElement("option");const q=state.quotes.find(z=>z.id===savedId);opt.value=savedId;opt.text=`${q?.name||(companyById(q?.companyId)?.name)||"Untitled"} · ${money(q?.totals?.annual||0)}/yr`;qSel.appendChild(opt);qSel.value=savedId;applyQuote(savedId);});};
     const cmpSel=document.getElementById("d_company");
-    if(cmpSel)cmpSel.onchange=()=>{if(!qSel)return;const cid=cmpSel.value;const fq=live(state.quotes).filter(q=>!cid||q.companyId===cid);qSel.innerHTML='<option value="">— Enter manually —</option>'+fq.map(q=>`<option value="${esc(q.id)}">${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("");applyQuote("");};
+    if(cmpSel)cmpSel.onchange=()=>{if(!qSel)return;const cid=cmpSel.value;const fq=live(state.quotes).filter(q=>(!cid||q.companyId===cid)&&(q.id===x.quoteId||!dealForQuote(q.id,id)));qSel.innerHTML='<option value="">— Enter manually —</option>'+fq.map(q=>`<option value="${esc(q.id)}">${esc(q.name||(companyById(q.companyId)?.name)||"Untitled")} · ${money(q.totals?.annual||0)}/yr</option>`).join("");applyQuote("");};
     if(id){
       const out=()=>$("#d-ai");
       const run=async(label,task)=>{out().innerHTML=`<span class="spin"></span> ${label}…`;
@@ -3861,6 +3865,7 @@ function renderQuotes(c){
 
   const rows=list.map(q=>{
     const co=companyById(q.companyId);const t=q.totals||{};
+    const linkedDeal=dealForQuote(q.id);
     return `<tr data-qid="${esc(q.id)}">
       <td><div class="cellname">${I.calc}<span>${esc(q.name||"Untitled quote")}</span></div></td>
       <td>${esc(co?.name||"—")}</td>
@@ -3869,7 +3874,7 @@ function renderQuotes(c){
       <td style="font-weight:600">${money(t.annual||0)}</td>
       <td><span class="chip"><span class="dot" style="background:${QUOTE_STATUS_COLOR[q.status]||"#94a3b8"}"></span>${esc(q.status||"draft")}</span></td>
       <td class="faint">${timeAgo(q.createdAt)}</td>
-      <td><div class="rowact" style="display:flex;gap:4px"><button class="iconbtn" data-qdeal="${esc(q.id)}" title="Create deal from quote">${I.trello}</button><button class="iconbtn" data-qedit="${esc(q.id)}" title="Edit quote">${I.edit}</button><button class="iconbtn" data-qdup="${esc(q.id)}" title="Duplicate as new quote">${I.copy}</button><button class="iconbtn" data-qdel="${esc(q.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button></div></td>
+      <td><div class="rowact" style="display:flex;gap:4px">${linkedDeal?`<button class="iconbtn" data-qdeal="${esc(q.id)}" title="Already attached to deal &quot;${esc(linkedDeal.name||"Untitled")}&quot; — a quote can only be used for one deal" style="opacity:.35">${I.trello}</button>`:`<button class="iconbtn" data-qdeal="${esc(q.id)}" title="Create deal from quote">${I.trello}</button>`}<button class="iconbtn" data-qedit="${esc(q.id)}" title="Edit quote">${I.edit}</button><button class="iconbtn" data-qdup="${esc(q.id)}" title="Duplicate as new quote">${I.copy}</button><button class="iconbtn" data-qdel="${esc(q.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button></div></td>
     </tr>`;
   }).join("");
 
@@ -3909,6 +3914,8 @@ function renderQuotes(c){
 // total, and integrations are carried over as line items for reference.
 function dealFromQuote(quote){
   if(!quote)return;
+  const existing=dealForQuote(quote.id);
+  if(existing){toast(`This quote is already attached to deal "${existing.name||"Untitled"}" — a quote can only be used for one deal`,"err");return;}
   const co=companyById(quote.companyId);
   const t=quote.totals||computeQuoteTotals({...quote,ai:quote.snapshot?.ai});
   const products=(quote.integrations||[]).map(it=>({name:it.name,qty:+it.qty||1,price:+(it.quotedMonthlyCost!=null?it.quotedMonthlyCost:it.monthlyCost)||0}));
