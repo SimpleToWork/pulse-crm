@@ -823,6 +823,8 @@ const state={ page:"dashboard", detail:null, user:null,
   _slackSyncing: false, _slackStatus: null,
   _dashOwner: localStorage.getItem("pulse-dash-owner")||"",
   _aiCostPerUser: parseFloat(localStorage.getItem("pulse-ai-cost-per-user"))||0,
+  _defaultPricePerUser: parseFloat(localStorage.getItem("pulse-default-price-per-user"))||0,
+  _defaultAILicensePrice: parseFloat(localStorage.getItem("pulse-default-ai-license-price"))||0,
   _settingsSections: JSON.parse(localStorage.getItem("pulse-settings-sections")||"{}") };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
@@ -2963,6 +2965,17 @@ function renderSettings(c){
           <div style="margin-top:14px"><button class="btn sm primary" id="sai-save">${I.check}Save AI assumptions</button></div>
           </div>
         </div>
+        <div class="card panel"><div class="panel-head" ${sc("quote-pricing")?'style="margin-bottom:0"':''}><h2>Quote Pricing Defaults</h2><div style="display:flex;gap:6px;align-items:center"><span class="faint" style="font-size:12px">Quote Builder · Section 2</span>${chv("quote-pricing")}</div></div>
+          <div id="ss-quote-pricing" ${sc("quote-pricing")?'style="display:none"':''}>
+          <div class="faint" style="font-size:12px;margin-bottom:12px">Default prices pre-filled in Quote Builder Section 2 for new quotes. Each field is editable per-quote.</div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap">
+            <div class="field" style="margin:0;min-width:200px"><label>Default Price Per User / mo ($)</label><input id="s-default-ppu" type="number" min="0" step="1" value="${intPricing.defaultPricePerUser||0}" placeholder="0"></div>
+            <div class="field" style="margin:0;min-width:200px"><label>Default Price Per AI License / mo ($)</label><input id="s-default-ailp" type="number" min="0" step="0.01" value="${intPricing.defaultAILicensePrice||0}" placeholder="0"></div>
+          </div>
+          <div class="faint" style="font-size:11.5px;margin-top:6px">Set to 0 to leave the Quote Builder field blank for manual entry. AI license amount defaults to the AI cost assumptions value when 0.</div>
+          <div style="margin-top:14px"><button class="btn sm primary" id="s-quote-pricing-save">${I.check}Save pricing defaults</button></div>
+          </div>
+        </div>
         <div class="card panel"><div class="panel-head" ${sc("integrations")?'style="margin-bottom:0"':''}><h2>Integrations</h2>${chv("integrations")}</div>
           <div id="ss-integrations" ${sc("integrations")?'style="display:none"':''}>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${["Gmail","Google Calendar","Stripe","Zapier","Webhooks"].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font-size:13px"><span>${s}</span><span class="faint" style="font-size:11px">Soon</span></div>`).join("")}</div></div></div>
@@ -3072,6 +3085,7 @@ function renderSettings(c){
   c.querySelectorAll('[id^="sai-"]').forEach(e=>{if(e.tagName==="INPUT")e.oninput=drawSAi;});
   document.getElementById("sai-save").onclick=async()=>{const aiOverride=parseFloat(document.getElementById("sai-aiCostOverride")?.value)||0;const aiPayload={ai:readSAi(),aiCostOverride:aiOverride};if(intPricing._id)await dbUpdate("quoteSettings",intPricing._id,aiPayload);else{const curInts=getQuoteSettings().integrations;await dbAdd("quoteSettings",{...aiPayload,integrations:curInts});}state._aiCostPerUser=aiOverride;if(aiOverride>0)localStorage.setItem("pulse-ai-cost-per-user",aiOverride);else localStorage.removeItem("pulse-ai-cost-per-user");toast("AI assumptions saved","ok");};
   document.getElementById("sai-reset").onclick=()=>{if(!confirm("Reset AI assumptions to defaults?"))return;AI_FIELDS.forEach(f=>{const e=document.getElementById("sai-"+f.k);if(e)e.value=f.pct?fmtPctV(DEFAULT_AI[f.k]):DEFAULT_AI[f.k];});drawSAi();};
+  document.getElementById("s-quote-pricing-save").onclick=async()=>{const ppu=parseFloat(document.getElementById("s-default-ppu")?.value)||0;const ailp=parseFloat(document.getElementById("s-default-ailp")?.value)||0;const payload={defaultPricePerUser:ppu,defaultAILicensePrice:ailp};const qs=getQuoteSettings();if(qs._id)await dbUpdate("quoteSettings",qs._id,payload);else{await dbAdd("quoteSettings",{...payload,ai:qs.ai,integrations:qs.integrations,aiCostOverride:qs.aiCostOverride});}state._defaultPricePerUser=ppu;state._defaultAILicensePrice=ailp;if(ppu>0)localStorage.setItem("pulse-default-price-per-user",ppu);else localStorage.removeItem("pulse-default-price-per-user");if(ailp>0)localStorage.setItem("pulse-default-ai-license-price",ailp);else localStorage.removeItem("pulse-default-ai-license-price");toast("Pricing defaults saved","ok");};
   const clayBtn=$("#clay-copy");
   if(clayBtn)clayBtn.onclick=()=>{const url=$("#clay-url-text")?.textContent||"";navigator.clipboard?.writeText(url).then(()=>{clayBtn.textContent="Copied!";setTimeout(()=>{clayBtn.textContent="Copy";},1500);}).catch(()=>{});}
   const sd=$("#seedbtn");if(sd)sd.onclick=()=>{ if(fbReady)seedLive(sd); else{seedDemo();toast("Sample data loaded","ok");render();} };
@@ -3154,7 +3168,6 @@ function integrationPricingModal(intId,contentEl){
   overlay.className="q-modal";
   document.body.appendChild(overlay);
   const close=()=>overlay.remove();
-  overlay.onclick=e=>{if(e.target===overlay)close();};
 
   const lvlOpts=[1,2,3,4,5].map(n=>`<option value="${n}" ${(existing?.level||1)===n?"selected":""}>${n} — ${["Rating 1 ($2k impl / $1k/mo / 5d)","Rating 2 ($3k impl / $1.5k/mo / 10d)","Rating 3 ($6k impl / $2k/mo / 15d)","Rating 4 ($8k impl / $2.5k/mo / 20d)","Rating 5 ($11k impl / $2.5k/mo / 25d)"][n-1]}</option>`).join("");
   overlay.innerHTML=`<div class="q-box" style="width:min(480px,100%);max-height:92vh">
@@ -3635,7 +3648,6 @@ function quoteModal(deal){
   overlay.className="q-modal";
   document.body.appendChild(overlay);
   const close=()=>overlay.remove();
-  overlay.onclick=e=>{if(e.target===overlay)close();};
 
   const docHtml=`<div class="q-doc">
     <h1>Quote</h1>
@@ -3690,7 +3702,7 @@ function getQuoteSettings(){
   const integrations=(doc&&Array.isArray(doc.integrations)&&doc.integrations.length)
     ?doc.integrations.map(x=>({...x}))
     :DEFAULT_INTEGRATIONS.map(x=>({...x}));
-  return {ai,integrations,_id:doc?doc.id:null,aiCostOverride:doc?.aiCostOverride||0};
+  return {ai,integrations,_id:doc?doc.id:null,aiCostOverride:doc?.aiCostOverride||0,defaultPricePerUser:doc?.defaultPricePerUser||0,defaultAILicensePrice:doc?.defaultAILicensePrice||0};
 }
 // Derived AI values — every number traceable to a source setting.
 function aiDerived(ai){
@@ -3718,10 +3730,12 @@ function computeQuoteTotals(q){
   const seatMonthly=users*pricePerUser;
   const bundleMonthly=Math.max(0,+(q.addons?.bundlePrice)||0);
   const dataMonthly=Math.max(0,+(q.addons?.dataVolume)||0);
-  const monthly=aiMonthly+seatMonthly+bundleMonthly+dataMonthly;
+  const subscriptionMonthly=seatMonthly+bundleMonthly+dataMonthly;
+  const subscriptionAnnual=subscriptionMonthly*12;
+  const monthly=aiMonthly+subscriptionMonthly;
   const annual=monthly*12;
   const processingCost=seatMonthly*(q.ai?.paymentProcessing||0);
-  return {implementation,perIntegrationMonthly,timelineDays,aiPricePerUser,aiMonthly,seatMonthly,bundleMonthly,dataMonthly,monthly,annual,processingCost,users,pricePerUser,aiLicenseCount};
+  return {implementation,perIntegrationMonthly,timelineDays,aiPricePerUser,aiMonthly,seatMonthly,bundleMonthly,dataMonthly,subscriptionMonthly,subscriptionAnnual,monthly,annual,processingCost,users,pricePerUser,aiLicenseCount};
 }
 function quoteContext(){
   const Q=live(state.quotes);
@@ -3750,7 +3764,7 @@ function renderQuotes(c){
   const rows=list.map(q=>{
     const co=companyById(q.companyId);const t=q.totals||{};
     return `<tr data-qid="${esc(q.id)}">
-      <td class="cellname">${I.calc}<span>${esc(q.name||"Untitled quote")}</span></td>
+      <td><div class="cellname">${I.calc}<span>${esc(q.name||"Untitled quote")}</span></div></td>
       <td>${esc(co?.name||"—")}</td>
       <td>${money(t.implementation||0)}</td>
       <td>${money(t.monthly||0)}</td>
@@ -3812,7 +3826,6 @@ function quoteBuilderModal(prefill,editId,onSaved){
   overlay.className="q-modal";
   document.body.appendChild(overlay);
   const close=()=>overlay.remove();
-  overlay.onclick=e=>{if(e.target===overlay)close();};
 
   const coOpts=[{v:"",l:"— No company —"},...live(state.companies).map(co=>({v:co.id,l:co.name}))];
   const preCo=prefill?.companyId||"";const preName=prefill?.name||"";
@@ -3882,9 +3895,9 @@ function quoteBuilderModal(prefill,editId,onSaved){
           <div class="qb-h">2 · Users &amp; AI</div>
           <div class="qb-inputs2" style="grid-template-columns:repeat(4,1fr)">
             <div class="field" style="margin:0"><label>Number of Users</label><input id="qb-users" type="number" min="0" step="1" value="${prefill?.users?.count??0}"></div>
-            <div class="field" style="margin:0"><label>Price Per User / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??0}"></div>
+            <div class="field" style="margin:0"><label>Price Per User / mo ($)</label><input id="qb-price" type="number" min="0" step="1" value="${prefill?.users?.pricePerUser??state._defaultPricePerUser}"></div>
             <div class="field" style="margin:0"><label>Number of AI Licenses</label><input id="qb-ai-users" type="number" min="0" step="1" value="${prefill?.users?.aiLicenseCount??prefill?.users?.count??0}"></div>
-            <div class="field" style="margin:0"><label>Amount Per AI License / mo ($)</label><input id="qb-ai-cost" type="number" min="0" step="0.01" value="${prefill?.aiCostOverride>0?prefill.aiCostOverride:(prefill?state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2):0)}"></div>
+            <div class="field" style="margin:0"><label>Amount Per AI License / mo ($)</label><input id="qb-ai-cost" type="number" min="0" step="0.01" value="${prefill?.aiCostOverride>0?prefill.aiCostOverride:(prefill?state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2):state._defaultAILicensePrice>0?state._defaultAILicensePrice:state._aiCostPerUser>0?state._aiCostPerUser:+derived.fullyLoaded.toFixed(2))}"></div>
           </div>
           <div class="faint" style="font-size:11.5px;margin-top:4px">AI license count and amount default to Settings values. Edit either to override for this quote only.</div>
         </div>
@@ -3948,16 +3961,19 @@ function quoteBuilderModal(prefill,editId,onSaved){
       </div>
       <div class="qb-sum-block">
         <div class="qb-sum-lbl">Monthly subscription</div>
-        ${line("AI licenses",money(t.aiMonthly),`${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)}`)}
         ${line("User seats",money(t.seatMonthly),`${t.users} × ${money(t.pricePerUser)}`)}
         ${line("Integration bundle",money(t.bundleMonthly))}
         ${line("Data volume",money(t.dataMonthly))}
-        <div class="qb-line qb-line-total"><span>Total / month</span><b>${money(t.monthly)}</b></div>
+        <div class="qb-line qb-line-total"><span>Total / month</span><b>${money(t.subscriptionMonthly)}</b></div>
       </div>
       <div class="qb-sum-block qb-sum-annual">
-        <div class="qb-sum-lbl">Annual subscription</div>
-        <div class="qb-sum-big accent">${money(t.annual)}</div>
-        <div class="qb-line-sub">${money(t.monthly)} × 12</div>
+        <div class="qb-sum-lbl">Total annual subscription</div>
+        <div class="qb-sum-big accent">${money(t.subscriptionAnnual)}</div>
+        <div class="qb-line-sub">${money(t.subscriptionMonthly)} × 12</div>
+      </div>
+      <div class="qb-sum-block qb-sum-annual">
+        <div class="qb-sum-lbl">AI Budget <span style="font-size:10px;font-weight:500;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:1px 5px;margin-left:4px;text-transform:none;letter-spacing:0">Billed monthly</span></div>
+        ${line("AI licenses",money(t.aiMonthly),`${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)}`)}
       </div>
       <div class="qb-sum-block qb-sum-ints">
         <div class="qb-sum-lbl" style="margin-bottom:6px">Selected integrations</div>
@@ -4010,7 +4026,10 @@ function quoteBuilderModal(prefill,editId,onSaved){
     box.querySelectorAll("tr.qb-lvl-hdr").forEach(tr=>{const lvl=+tr.dataset.level;tr.style.display=(!q||visCount[lvl])?"":"none";});
     intEmpty.style.display=(q&&!Object.keys(visCount).length)?"":"none";
   };
-  ["qb-users","qb-price","qb-data","qb-ai-cost"].forEach(id=>{const e=overlay.querySelector("#"+id);if(e)e.oninput=paint;});
+  let aiLicTouched=prefill?.users?.aiLicenseCount!=null;
+  ["qb-price","qb-data","qb-ai-cost"].forEach(id=>{const e=overlay.querySelector("#"+id);if(e)e.oninput=paint;});
+  const qbUsersInp=overlay.querySelector("#qb-users");if(qbUsersInp)qbUsersInp.oninput=()=>{if(!aiLicTouched){const ai=overlay.querySelector("#qb-ai-users");if(ai)ai.value=qbUsersInp.value;}paint();};
+  const qbAiUsersInp=overlay.querySelector("#qb-ai-users");if(qbAiUsersInp)qbAiUsersInp.oninput=()=>{aiLicTouched=true;paint();};
   overlay.querySelector("#qb-bundle").oninput=()=>{bundleTouched=true;paint();};
   // Bidirectional company ↔ contact linking
   const coSel=overlay.querySelector("#qb-company");
@@ -4080,7 +4099,6 @@ function quoteViewModal(quote){
   overlay.className="q-modal";
   document.body.appendChild(overlay);
   const close=()=>overlay.remove();
-  overlay.onclick=e=>{if(e.target===overlay)close();};
 
   const intTable=ints.length?`<table class="qtable">
     <thead><tr><th>Integration</th><th style="text-align:center">Lvl</th><th style="text-align:right">Rec. Impl</th><th style="text-align:right">Rec. Monthly</th><th style="text-align:right">Quoted Impl</th><th style="text-align:right">Quoted Monthly</th></tr></thead>
@@ -4096,16 +4114,18 @@ function quoteViewModal(quote){
     </div>
     <div class="qsec"><h3>Integrations &amp; implementation</h3>${intTable}</div>
     <div class="qsec"><h3>Monthly subscription</h3><table class="qtable"><tbody>
-      <tr><td>AI licenses <span style="color:#999">(${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)})</span></td><td style="text-align:right">${money(t.aiMonthly)}</td></tr>
       <tr><td>User seats <span style="color:#999">(${t.users} × ${money(t.pricePerUser)})</span></td><td style="text-align:right">${money(t.seatMonthly)}</td></tr>
       <tr><td>Integration bundle</td><td style="text-align:right">${money(t.bundleMonthly)}</td></tr>
       <tr><td>Data volume add-on</td><td style="text-align:right">${money(t.dataMonthly)}</td></tr>
     </tbody></table></div>
     <div class="qtotal">
       <div class="qtrow"><div class="ql">Implementation</div><div class="qv">${money(t.implementation)}</div></div>
-      <div class="qtrow"><div class="ql">Monthly</div><div class="qv">${money(t.monthly)}</div></div>
-      <div class="qtrow"><div class="ql">Annual</div><div class="qv big">${money(t.annual)}</div></div>
+      <div class="qtrow"><div class="ql">Monthly subscription</div><div class="qv">${money(t.subscriptionMonthly)}</div></div>
+      <div class="qtrow"><div class="ql">Total annual subscription</div><div class="qv big">${money(t.subscriptionAnnual)}</div></div>
     </div>
+    <div class="qsec" style="margin-top:16px"><h3>AI Budget <span style="font-size:11px;font-weight:500;color:#fff;background:var(--accent);border-radius:3px;padding:1px 6px;margin-left:4px">Billed monthly</span></h3><table class="qtable"><tbody>
+      <tr><td>AI licenses <span style="color:#999">(${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)})</span></td><td style="text-align:right;font-weight:600">${money(t.aiMonthly)}/mo</td></tr>
+    </tbody></table></div>
     ${t.timelineDays?`<div class="qsec" style="margin-top:20px"><h3>Estimated timeline</h3><div style="font-size:13px">${t.timelineDays} days</div></div>`:""}
     <details class="qsec" style="margin-top:18px"><summary style="cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:#999">Settings snapshot used for this quote</summary>
       <div style="margin-top:10px;font-size:12.5px;line-height:1.7;color:#555">
@@ -4134,7 +4154,7 @@ function quoteViewModal(quote){
 
   const plain=()=>{
     const il=ints.map(it=>`  ${(it.name+" ×"+it.qty).padEnd(30)} impl ${money(it.implCost*it.qty)}  mo ${money(it.monthlyCost*it.qty)}`).join("\n");
-    return `QUOTE — ${quote.name||""}\nDate: ${qDate}   Status: ${quote.status||"draft"}\n\nBILL TO: ${co?.name||"—"}${ct?" / "+contactName(ct):""}\n\nINTEGRATIONS & IMPLEMENTATION:\n${il||"  (none)"}\n\nMONTHLY:\n  AI licenses (${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)}): ${money(t.aiMonthly)}\n  User seats (${t.users} × ${money(t.pricePerUser)}): ${money(t.seatMonthly)}\n  Integration bundle: ${money(t.bundleMonthly)}\n  Data volume: ${money(t.dataMonthly)}\n\n  Implementation (one-time): ${money(t.implementation)}\n  Monthly subscription:      ${money(t.monthly)}\n  Annual subscription:       ${money(t.annual)}${t.timelineDays?`\n  Est. timeline:             ${t.timelineDays} days`:""}\n\nPricing frozen at creation. Subject to final contract terms.`;
+    return `QUOTE — ${quote.name||""}\nDate: ${qDate}   Status: ${quote.status||"draft"}\n\nBILL TO: ${co?.name||"—"}${ct?" / "+contactName(ct):""}\n\nINTEGRATIONS & IMPLEMENTATION:\n${il||"  (none)"}\n\nMONTHLY SUBSCRIPTION:\n  User seats (${t.users} × ${money(t.pricePerUser)}): ${money(t.seatMonthly)}\n  Integration bundle: ${money(t.bundleMonthly)}\n  Data volume: ${money(t.dataMonthly)}\n\n  Implementation (one-time):       ${money(t.implementation)}\n  Monthly subscription:            ${money(t.subscriptionMonthly)}\n  Total annual subscription:       ${money(t.subscriptionAnnual)}${t.timelineDays?`\n  Est. timeline:                   ${t.timelineDays} days`:""}\n\nAI BUDGET (billed monthly — separate):\n  AI licenses (${t.aiLicenseCount} × ${fmtUSD(t.aiPricePerUser)}): ${money(t.aiMonthly)}/mo\n\nPricing frozen at creation. Subject to final contract terms.`;
   };
   overlay.querySelector("#qvCopy").onclick=()=>navigator.clipboard.writeText(plain()).then(()=>toast("Quote copied","ok")).catch(()=>toast("Copy failed","err"));
   overlay.querySelector("#qvDl").onclick=()=>{const a=document.createElement("a");const slug=(quote.name||"quote").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/-+$/,"");a.href=URL.createObjectURL(new Blob([plain()],{type:"text/plain"}));a.download=`${slug||"quote"}.txt`;a.click();URL.revokeObjectURL(a.href);toast("Quote downloaded","ok");};
@@ -4390,7 +4410,7 @@ function subscribe(){
   const colls=["contacts","companies","deals","tasks","activities","members","tickets","products","templates","supportCategories","slaRules","quotes","quoteSettings","pipelineStages"];
   colls.forEach(name=>onSnapshot(collection(db,name),snap=>{
     state[name]=snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}}
+    if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}if(qs&&qs.defaultPricePerUser>0){state._defaultPricePerUser=qs.defaultPricePerUser;localStorage.setItem("pulse-default-price-per-user",qs.defaultPricePerUser);}else{state._defaultPricePerUser=0;localStorage.removeItem("pulse-default-price-per-user");}if(qs&&qs.defaultAILicensePrice>0){state._defaultAILicensePrice=qs.defaultAILicensePrice;localStorage.setItem("pulse-default-ai-license-price",qs.defaultAILicensePrice);}else{state._defaultAILicensePrice=0;localStorage.removeItem("pulse-default-ai-license-price");}}
     scheduleRender();
   },err=>{console.error(name,err);if(err&&err.code==="permission-denied")toast(`Firestore rules block '${name}' — run: npm run deploy:rules`,"err");}));
 }
