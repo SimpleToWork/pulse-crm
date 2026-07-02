@@ -1637,7 +1637,7 @@ function renderSidebar(){
   const collapsed=state.navCollapsed;
   $("#sidebar").className="sidebar"+(state.sideOpen?" show":"")+(collapsed?" collapsed":"");
   $("#sidebar").innerHTML=`
-    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>merchantsbi</b><button class="nav-collapse-btn" id="nav-collapse-btn" title="${collapsed?"Expand sidebar":"Collapse sidebar"}">${I.chevronLeft}</button></div>
+    <div class="brand"><img class="logo" src="/mbi-logo.png" alt="MerchantsBI"><b>MerchantBI</b><button class="nav-collapse-btn" id="nav-collapse-btn" title="${collapsed?"Expand sidebar":"Collapse sidebar"}">${I.chevronLeft}</button></div>
     <nav class="nav">${nav}</nav>
     <div class="side-foot">
       <div class="me">${ava(u.name||u.email,30)}<div class="info"><div class="nm">${esc(u.name||"You")}</div><div class="em">${esc(u.email)}</div></div></div>
