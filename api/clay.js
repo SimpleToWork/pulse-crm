@@ -172,23 +172,6 @@ export default async function handler(req, res) {
   const missing = ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY"].filter((k) => !process.env[k]);
   if (missing.length) return res.status(503).json({ error: `Missing env vars: ${missing.join(", ")}` });
 
-  // TEMP diagnostic (no secret values leaked) — POST {"diag":true}
-  if (req.body && req.body.diag === true) {
-    const pk = normalizeKey(process.env.FIREBASE_PRIVATE_KEY);
-    const email = process.env.FIREBASE_CLIENT_EMAIL || "";
-    return res.status(200).json({
-      diag: true,
-      projectId: process.env.FIREBASE_PROJECT_ID || null,
-      clientEmailMasked: email.slice(0, 6) + "…@" + (email.split("@")[1] || "?"),
-      emailProjectMatches: email.includes(process.env.FIREBASE_PROJECT_ID || "\0"),
-      keyLen: pk.length,
-      keyBeginsOK: pk.startsWith("-----BEGIN PRIVATE KEY-----"),
-      keyEndsOK: pk.trimEnd().endsWith("-----END PRIVATE KEY-----"),
-      keyRealNewlines: (pk.match(/\n/g) || []).length,
-      keyHasLiteralBackslashN: /\\n/.test(pk),
-    });
-  }
-
   // Accept a single row object, an array, or {rows:[...]}
   const body = req.body || {};
   const rows = Array.isArray(body) ? body : Array.isArray(body.rows) ? body.rows : [body];
