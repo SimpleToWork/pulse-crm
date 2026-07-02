@@ -3999,6 +3999,11 @@ function quoteBuilderModal(prefill,editId,onSaved){
             <div class="field" style="margin-bottom:10px"><label>Company</label><select id="qb-company">${coOpts.map(o=>opt(o,preCo)).join("")}</select></div>
           </div>
           <div class="field" style="margin-bottom:0"><label>Contact (optional)</label><select id="qb-contact">${ctOptsFor(preCo).map(o=>opt(o,preCt)).join("")}</select></div>
+          <div class="qb-inputs3" style="margin-top:10px">
+            <div class="field" style="margin:0"><label>What will MerchantBI solve for this client</label><textarea id="qb-solve" class="input" rows="4" style="resize:vertical;width:100%;box-sizing:border-box;font-family:inherit" placeholder="e.g. consolidate reporting, replace manual Excel processes…">${esc(prefill?.clientContext?.whatWeWillSolve||"")}</textarea></div>
+            <div class="field" style="margin:0"><label>Biggest pain points</label><textarea id="qb-pain" class="input" rows="4" style="resize:vertical;width:100%;box-sizing:border-box;font-family:inherit" placeholder="e.g. data scattered across systems, slow month-end close…">${esc(prefill?.clientContext?.biggestPainPoints||"")}</textarea></div>
+            <div class="field" style="margin:0"><label>Modules to report &amp; dashboard on</label><textarea id="qb-modules" class="input" rows="4" style="resize:vertical;width:100%;box-sizing:border-box;font-family:inherit" placeholder="e.g. Sales performance, inventory, P&amp;L…">${esc(prefill?.clientContext?.modulesWanted||"")}</textarea></div>
+          </div>
         </div>
         <div class="qb-section">
           <div class="qb-h">1 · Integrations <span class="qb-h-sub">check to select · edit quoted fees to override pricing</span></div>
@@ -4195,6 +4200,7 @@ function quoteBuilderModal(prefill,editId,onSaved){
       users:q.users,
       addons:q.addons,
       aiCostOverride:q.aiCostOverride||0,
+      clientContext:{whatWeWillSolve:(overlay.querySelector("#qb-solve")?.value||"").trim(),biggestPainPoints:(overlay.querySelector("#qb-pain")?.value||"").trim(),modulesWanted:(overlay.querySelector("#qb-modules")?.value||"").trim()},
       snapshot:{ai:{...ai},integrations:settings.integrations.map(x=>({...x})),derived:aiDerived(ai),aiCostOverride:q.aiCostOverride||0},
       totals,
     };
