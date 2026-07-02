@@ -830,7 +830,8 @@ const state={ page:"dashboard", detail:null, user:null,
   _aiCostPerUser: parseFloat(localStorage.getItem("pulse-ai-cost-per-user"))||0,
   _defaultPricePerUser: parseFloat(localStorage.getItem("pulse-default-price-per-user"))||0,
   _defaultAILicensePrice: parseFloat(localStorage.getItem("pulse-default-ai-license-price"))||0,
-  _settingsSections: JSON.parse(localStorage.getItem("pulse-settings-sections")||"{}") };
+  _settingsSections: JSON.parse(localStorage.getItem("pulse-settings-sections")||"{}"),
+  _pendingDeal: new URLSearchParams(location.search).get("deal")||null };
 let localSeq=1;
 const live=arr=>arr.filter(x=>!x.deletedAt);
 // One-to-one quote↔deal binding: returns the live deal a quote is already attached to
@@ -4534,10 +4535,22 @@ function doSignOut(){ if(fbReady)signOut(auth); else {state.user=null;render();}
 /* ====================================================================
    FIRESTORE WIRING / DEMO SEED
 ==================================================================== */
+// Deep-link: open ?deal=<id> once its data has loaded. Attempts once (found or
+// not) then clears state + URL so a refresh won't reopen. Fails silently if the
+// id isn't present (soft-deleted or nonexistent).
+function tryOpenPendingDeal(){
+  const id=state._pendingDeal; if(!id)return;
+  state._pendingDeal=null;
+  try{history.replaceState({},"",location.pathname);}catch(e){}
+  if(!live(state.deals).some(d=>d.id===id))return;
+  state.page="deals";state.detail=null;render();
+  setTimeout(()=>dealForm(id),100);
+}
 function subscribe(){
   const colls=["contacts","companies","deals","tasks","activities","members","tickets","products","templates","supportCategories","slaRules","quotes","quoteSettings","pipelineStages"];
   colls.forEach(name=>onSnapshot(collection(db,name),snap=>{
     state[name]=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(name==="deals")tryOpenPendingDeal();
     if(name==="quoteSettings"){const qs=live(state.quoteSettings)[0];if(qs&&qs.aiCostOverride>0){state._aiCostPerUser=qs.aiCostOverride;localStorage.setItem("pulse-ai-cost-per-user",qs.aiCostOverride);}if(qs&&qs.defaultPricePerUser>0){state._defaultPricePerUser=qs.defaultPricePerUser;localStorage.setItem("pulse-default-price-per-user",qs.defaultPricePerUser);}else{state._defaultPricePerUser=0;localStorage.removeItem("pulse-default-price-per-user");}if(qs&&qs.defaultAILicensePrice>0){state._defaultAILicensePrice=qs.defaultAILicensePrice;localStorage.setItem("pulse-default-ai-license-price",qs.defaultAILicensePrice);}else{state._defaultAILicensePrice=0;localStorage.removeItem("pulse-default-ai-license-price");}}
     scheduleRender();
   },err=>{console.error(name,err);if(err&&err.code==="permission-denied")toast(`Firestore rules block '${name}' — run: npm run deploy:rules`,"err");}));
