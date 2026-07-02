@@ -1839,6 +1839,43 @@ function renderDashboard(c){
   const filterLabel=selOwner?`<span style="background:var(--accent-soft);color:var(--accent-ink);border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;margin-left:8px">${esc(selOwner)}</span>`:"";
   const tfBtns=Object.entries(tfLabels).map(([k,v])=>`<button class="btn sm${tf===k?" primary":""}" data-dashtf="${k}">${v}</button>`).join("");
 
+  // closed deals by month — last 12 months, Won (green) stacked on Lost (red)
+  const closedByMonthChart=()=>{
+    const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const now=new Date();
+    const wonSrc=selOwner?allLiveWon.filter(d=>(d.owner||"")===selOwner):allLiveWon;
+    const lostSrc=selOwner?allLiveLost.filter(d=>(d.owner||"")===selOwner):allLiveLost;
+    const buckets=[];
+    for(let i=11;i>=0;i--){
+      const dt=new Date(now.getFullYear(),now.getMonth()-i,1),y=dt.getFullYear(),mo=dt.getMonth();
+      const wonM=wonSrc.filter(d=>{const cd=new Date(d.closedAt||d.createdAt||0);return cd.getFullYear()===y&&cd.getMonth()===mo;});
+      const lostM=lostSrc.filter(d=>{const cd=new Date(d.closedAt||d.createdAt||0);return cd.getFullYear()===y&&cd.getMonth()===mo;});
+      buckets.push({lbl:MO[mo]+(mo===0?" '"+String(y).slice(2):""),won:wonM.length,lost:lostM.length,wonVal:wonM.reduce((s,d)=>s+(+d.value||0),0)});
+    }
+    if(!wonSrc.length&&!lostSrc.length) return emptyMini("No closed deals","Won and lost deals appear here once you close some.");
+    const maxC=Math.max(1,...buckets.map(b=>b.won+b.lost));
+    const W=520,H=150,pL=28,pR=8,pT=10,pB=30,bGap=3,n=buckets.length;
+    const bW=Math.floor((W-pL-pR-bGap*(n-1))/n),cH=H-pT-pB;
+    const bars=buckets.map((b,i)=>{
+      const x=pL+i*(bW+bGap),wH=Math.round(b.won/maxC*cH),lH=Math.round(b.lost/maxC*cH);
+      const wY=H-pB-wH,lY=wY-lH;
+      const tip=`${b.lbl}: ${b.won} won${b.wonVal?" ("+moneyK(b.wonVal)+")":""}, ${b.lost} lost`;
+      return (b.lost?`<rect x="${x}" y="${lY}" width="${bW}" height="${lH||1}" fill="#f87171" rx="2" opacity=".85"><title>${esc(tip)}</title></rect>`:"")
+        +(b.won?`<rect x="${x}" y="${wY}" width="${bW}" height="${wH||1}" fill="#16a34a" rx="2" opacity=".9"><title>${esc(tip)}</title></rect>`:"")
+        +`<text x="${x+bW/2}" y="${H-pB+12}" text-anchor="middle" font-size="8.5" fill="var(--muted)">${esc(b.lbl)}</text>`;
+    }).join("");
+    const yTicks=[0,.5,1].map(p=>{
+      const y=H-pB-Math.round(p*cH),v=Math.round(p*maxC);
+      return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="var(--line)" stroke-width="1" stroke-dasharray="${p?"3,2":""}"/>`
+        +(p?`<text x="${pL-3}" y="${y+3}" text-anchor="end" font-size="8.5" fill="var(--muted)">${v}</text>`:"");
+    }).join("");
+    return `<div style="overflow-x:auto"><svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block">${yTicks}${bars}</svg></div>
+      <div style="display:flex;gap:12px;font-size:11px;margin-top:4px">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#16a34a;border-radius:2px;display:inline-block"></span>Won</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#f87171;border-radius:2px;display:inline-block"></span>Lost</span>
+      </div>`;
+  };
+
   c.innerHTML=`
     <div class="page-top"><div class="pagehead"><div><h1>Dashboard${filterLabel}</h1><div class="sub">Good to see you, ${esc((state.user.name||"there").split(" ")[0])}. Here's your pipeline at a glance.</div></div>
       <div style="display:flex;gap:8px;align-items:center">
@@ -1864,6 +1901,7 @@ function renderDashboard(c){
       <div class="card panel"><div class="panel-head"><h2>Pipeline by stage</h2>${viewToggle}</div>${viewContent||emptyMini("No open deals","Add a deal to see your pipeline build.")}</div>
       <div class="card panel"><div class="panel-head"><h2>Recent activity</h2><button class="btn ghost sm" id="activity-toggle" title="${state.activityCollapsed?"Expand":"Collapse"} recent activity" style="padding:3px 7px;font-size:12px">${state.activityCollapsed?I.chevronDown:I.chevronUp}</button></div>${state.activityCollapsed?"":` <div class="timeline">${feed}</div>`}</div>
     </div>
+    <div class="card panel" style="margin-top:16px"><div class="panel-head"><h2>Closed deals by month</h2><span class="muted" style="font-size:12px">Last 12 months</span></div>${closedByMonthChart()}</div>
     `;
   $("#dash-owner-filter").onchange=e=>{state._dashOwner=e.target.value;try{localStorage.setItem("pulse-dash-owner",state._dashOwner);}catch(_){}renderDashboard(c);};
   c.querySelectorAll("[data-dashtf]").forEach(btn=>btn.onclick=()=>{
@@ -2945,7 +2983,7 @@ function renderSettings(c){
           <div id="ps-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px"></div>
           <div style="display:flex;gap:8px;align-items:center"><button class="btn sm primary" id="ps-save">${I.check}Save order &amp; colors</button><span class="faint" style="font-size:12px">Drag rows to reorder. Changes apply instantly across all views after saving.</span></div></div></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:14px">
         <div class="card panel"><div class="panel-head" ${sc("appearance")?'style="margin-bottom:0"':''}><h2>Appearance</h2>${chv("appearance")}</div>
           <div id="ss-appearance" ${sc("appearance")?'style="display:none"':''}>
           <div style="display:flex;gap:8px"><button class="btn ${state.theme==="light"?"primary":""}" data-theme-set="light">${I.sun}Light</button><button class="btn ${state.theme==="dark"?"primary":""}" data-theme-set="dark">${I.moon}Dark</button></div></div></div>
