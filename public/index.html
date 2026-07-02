@@ -506,7 +506,9 @@
   .qb-step-btn:hover{background:var(--surface-2);border-color:var(--accent);}
   .qb-qty{font-size:13px;font-weight:700;min-width:16px;text-align:center;font-family:'Space Grotesk',sans-serif;}
   .qb-step-lbl{font-size:10.5px;color:var(--faint);margin-left:auto;}
-  .qb-inputs3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .qb-inputs3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:start;}
+  .qb-inputs3 .field{display:flex;flex-direction:column;}
+  .qb-inputs3 .field label{min-height:36px;}
   .qb-inputs2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
   .qb-sum{padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;}
   .qb-sum-h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--faint);}
