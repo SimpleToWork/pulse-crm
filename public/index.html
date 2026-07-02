@@ -3869,7 +3869,7 @@ function renderQuotes(c){
       <td style="font-weight:600">${money(t.annual||0)}</td>
       <td><span class="chip"><span class="dot" style="background:${QUOTE_STATUS_COLOR[q.status]||"#94a3b8"}"></span>${esc(q.status||"draft")}</span></td>
       <td class="faint">${timeAgo(q.createdAt)}</td>
-      <td><div class="rowact" style="display:flex;gap:4px"><button class="iconbtn" data-qedit="${esc(q.id)}" title="Edit quote">${I.edit}</button><button class="iconbtn" data-qdup="${esc(q.id)}" title="Duplicate as new quote">${I.copy}</button><button class="iconbtn" data-qdel="${esc(q.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button></div></td>
+      <td><div class="rowact" style="display:flex;gap:4px"><button class="iconbtn" data-qdeal="${esc(q.id)}" title="Create deal from quote">${I.trello}</button><button class="iconbtn" data-qedit="${esc(q.id)}" title="Edit quote">${I.edit}</button><button class="iconbtn" data-qdup="${esc(q.id)}" title="Duplicate as new quote">${I.copy}</button><button class="iconbtn" data-qdel="${esc(q.id)}" title="Delete" style="color:var(--danger)">${I.trash}</button></div></td>
     </tr>`;
   }).join("");
 
@@ -3897,10 +3897,31 @@ function renderQuotes(c){
   wireFdd("q-search",v=>{state._qSearch=v;renderQuotes(c);});
   wireMsdd("q-status",v=>{state._qStatusF=v;renderQuotes(c);});
   c.querySelectorAll("th[data-sort]").forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(k==="company")return;const s=state._qSort;s.dir=s.col===k&&s.dir==="asc"?"desc":"asc";s.col=k;renderQuotes(c);});
-  c.querySelectorAll("tbody tr[data-qid]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-qdel]")||e.target.closest("[data-qdup]")||e.target.closest("[data-qedit]"))return;const q=state.quotes.find(x=>x.id===tr.dataset.qid);if(q)quoteViewModal(q);});
+  c.querySelectorAll("tbody tr[data-qid]").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-qdel]")||e.target.closest("[data-qdup]")||e.target.closest("[data-qedit]")||e.target.closest("[data-qdeal]"))return;const q=state.quotes.find(x=>x.id===tr.dataset.qid);if(q)quoteViewModal(q);});
+  c.querySelectorAll("[data-qdeal]").forEach(b=>b.onclick=()=>{const q=state.quotes.find(x=>x.id===b.dataset.qdeal);if(q)dealFromQuote(q);});
   c.querySelectorAll("[data-qdel]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this quote?"))return;await dbRemove("quotes",b.dataset.qdel,"Quote");});
   c.querySelectorAll("[data-qdup]").forEach(b=>b.onclick=()=>{const q=state.quotes.find(x=>x.id===b.dataset.qdup);if(q)quoteBuilderModal(q);});
   c.querySelectorAll("[data-qedit]").forEach(b=>b.onclick=()=>{const q=state.quotes.find(x=>x.id===b.dataset.qedit);if(q)quoteBuilderModal(q,q.id);});
+}
+
+// Open the deal drawer pre-populated from an existing quote. The new deal is
+// linked to the quote (quoteId) so its value stays synced to the quote's annual
+// total, and integrations are carried over as line items for reference.
+function dealFromQuote(quote){
+  if(!quote)return;
+  const co=companyById(quote.companyId);
+  const t=quote.totals||computeQuoteTotals({...quote,ai:quote.snapshot?.ai});
+  const products=(quote.integrations||[]).map(it=>({name:it.name,qty:+it.qty||1,price:+(it.quotedMonthlyCost!=null?it.quotedMonthlyCost:it.monthlyCost)||0}));
+  dealForm(null,{
+    companyId:quote.companyId||null,
+    contactId:quote.contactId||null,
+    name:quote.name||((co?.name?co.name+" — ":"")+"Deal from quote"),
+    value:t.annual||0,
+    quoteId:quote.id,
+    stage:"Proposal Sent",
+    products,
+    notes:`Created from quote "${quote.name||"Untitled"}".`
+  });
 }
 
 // The live builder. `prefill` (optional) seeds fields from an existing quote.
@@ -4235,6 +4256,7 @@ function quoteViewModal(quote){
 
   overlay.innerHTML=`<div class="q-box">
     <div class="q-head"><h2>${I.calc} ${esc(quote.name||"Quote")}</h2><div style="display:flex;gap:8px">
+      <button class="btn sm primary" id="qvDeal">${I.trello}<span>Create deal</span></button>
       <button class="btn sm" id="qvEdit">${I.edit}<span>Edit</span></button>
       <button class="btn sm" id="qvAi">${I.spark}<span>Explain</span></button>
       <button class="btn sm" id="qvCopy">${I.copy}<span>Copy</span></button>
@@ -4248,6 +4270,7 @@ function quoteViewModal(quote){
 
   overlay.querySelector("#qvX").onclick=close;
   overlay.querySelector("#qvClose").onclick=close;
+  overlay.querySelector("#qvDeal").onclick=()=>{close();dealFromQuote(quote);};
   overlay.querySelector("#qvEdit").onclick=()=>{close();quoteBuilderModal(quote,quote.id);};
 
   const plain=()=>{
