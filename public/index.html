@@ -204,6 +204,10 @@
   thead th.sorted-desc .sort-ind::after{content:"↓";opacity:1;color:var(--accent);}
   thead th:not(.sorted-asc):not(.sorted-desc) .sort-ind::after{content:"↕";}
   thead th:has(.sdd){vertical-align:top;white-space:normal;position:relative;}
+  .cb-col{width:36px;padding:0 6px!important;text-align:center!important;}
+  .cb-col input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);display:block;margin:0 auto;}
+  tbody tr.row-selected>td{background:var(--accent-soft);}
+  .bulk-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--accent-soft);border-bottom:1px solid var(--line);font-size:13px;font-weight:500;color:var(--accent-ink);border-radius:var(--r-sm) var(--r-sm) 0 0;}
   .th-fd{display:inline-block;position:relative;vertical-align:middle;margin-left:4px;}
   .th-fd-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;cursor:pointer;color:var(--faint);transition:color .13s,background .13s;}
   .th-fd-btn svg{width:11px;height:11px;}
@@ -810,6 +814,7 @@ const state={ page:"dashboard", detail:null, user:null,
   _dDateTo: localStorage.getItem("pulse-deals-dateto")||"",
   _dealsTf: localStorage.getItem("pulse-deals-tf")||"all", _dealsTfFrom:"", _dealsTfTo:"",
   _tkSort:{col:"createdAt",dir:"desc"}, _tkXf:{},
+  _cSel:new Set(), _coSel:new Set(), _dSel:new Set(), _tSel:new Set(), _tkSel:new Set(),
   _tmplSearch:"", _tmplCat:"",
   _dashTf: localStorage.getItem("pulse-dash-tf")||"30d", _dashDateFrom:"", _dashDateTo:"",
   _etlInstantlyKey: localStorage.getItem("pulse-instantly-key")||"",
@@ -2010,13 +2015,17 @@ function renderContacts(c){
     });}else{rows.sort((a,b)=>b.updatedAt-a.updatedAt);}
     const setSort=col=>{if(state._cSort.col===col)state._cSort.dir=state._cSort.dir==="asc"?"desc":"asc";else{state._cSort.col=col;state._cSort.dir="asc";}state._cPage=1;draw();};
     const pg=pageSlice(rows,"_cPage");
-    $("#ctable").innerHTML=rows.length?`<table><thead>
+    const cAllChk=pg.rows.length&&pg.rows.every(x=>state._cSel.has(x.id));
+    const cBulk=state._cSel.size?`<div class="bulk-bar"><span>${state._cSel.size} selected</span><button class="btn sm ghost" id="csel-clear">Clear</button><button class="btn sm danger" id="csel-del">Delete selected</button></div>`:"";
+    $("#ctable").innerHTML=rows.length?cBulk+`<table><thead>
       <tr>
+        <th class="cb-col"><input type="checkbox" class="sel-all"${cAllChk?" checked":""}></th>
         ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
         <th></th>
       </tr>
       </thead><tbody>
-      ${pg.rows.map(x=>`<tr data-id="${x.id}">
+      ${pg.rows.map(x=>`<tr data-id="${x.id}"${state._cSel.has(x.id)?' class="row-selected"':""}>
+        <td class="cb-col"><input type="checkbox" class="row-sel" data-sel-id="${x.id}"${state._cSel.has(x.id)?" checked":""}></td>
         <td><div class="cellname">${ava(contactName(x),28)}<div><div>${esc(contactName(x))||"—"}</div><div class="faint" style="font-size:11.5px">${esc(x.title||"")}</div></div></div></td>
         <td>${esc(companyById(x.companyId)?.name||"—")}</td>
         <td class="muted">${esc(x.email||"—")}</td>
@@ -2029,8 +2038,13 @@ function renderContacts(c){
     $("#ctable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
     wirePager($("#ctable"),rows.length,"_cPage",draw);
     COLS.forEach(col=>wireXf("cf-"+col.k,{type:col.type,distinct:()=>xfDistinct(list,col.get,col.type),f:xfs[col.k],onApply:f=>{state._cXf[col.k]=f;state._cPage=1;draw();}}));
-    $("#ctable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{ if(e.target.closest("[data-edit]"))return; state.detail={type:"contact",id:tr.dataset.id};render(); });
+    $("#ctable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{ if(e.target.closest("[data-edit]")||e.target.closest(".cb-col"))return; state.detail={type:"contact",id:tr.dataset.id};render(); });
     $("#ctable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();contactForm(b.dataset.edit);});
+    const cSelAll=$("#ctable").querySelector(".sel-all");
+    if(cSelAll)cSelAll.onchange=e=>{e.stopPropagation();if(cSelAll.checked)pg.rows.forEach(x=>state._cSel.add(x.id));else pg.rows.forEach(x=>state._cSel.delete(x.id));draw();};
+    $("#ctable").querySelectorAll(".row-sel").forEach(cb=>cb.onchange=e=>{e.stopPropagation();if(cb.checked)state._cSel.add(cb.dataset.selId);else state._cSel.delete(cb.dataset.selId);draw();});
+    const cSelClr=$("#csel-clear");if(cSelClr)cSelClr.onclick=e=>{e.stopPropagation();state._cSel.clear();draw();};
+    const cSelDel=$("#csel-del");if(cSelDel)cSelDel.onclick=async e=>{e.stopPropagation();const n=state._cSel.size;if(!confirm(`Delete ${n} contact${n===1?"":"s"}? This cannot be undone.`))return;const ids=[...state._cSel];state._cSel.clear();await Promise.all(ids.map(id=>dbRemove("contacts",id,"Contact")));draw();};
     const n2=$("#newc2"); if(n2)n2.onclick=()=>contactForm();
   };
   $("#newc").onclick=()=>contactForm();
@@ -2049,7 +2063,7 @@ function renderContactDetail(c,id){
       <span class="ava big-ava" style="background:${colorFor(contactName(x))}">${esc(initials(contactName(x)))}</span>
       <div style="flex:1"><h1>${esc(contactName(x))||"Unnamed"}</h1><div class="meta">${esc(x.title||"")}${co?` · <a href="#" id="golinkco-head"><b>${esc(co.name)}</b></a>`:""}</div>
         <div style="margin-top:8px"><span class="chip"><span class="dot" style="background:${STATUS_COLOR[x.status]||"#94a3b8"}"></span>${esc(x.status||"Lead")}</span> ${(x.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div></div>
-      <div style="display:flex;gap:8px"><button class="btn" id="edit">${I.edit}<span>Edit</span></button></div>
+      <div style="display:flex;gap:8px"><button class="btn danger" id="del">${I.trash}<span>Delete</span></button><button class="btn" id="edit">${I.edit}<span>Edit</span></button></div>
     </div>
     <div class="grid2">
       <div style="display:flex;flex-direction:column;gap:14px">
@@ -2071,6 +2085,7 @@ function renderContactDetail(c,id){
     </div>`;
   $("#back").onclick=()=>{state.detail=null;render();};
   $("#edit").onclick=()=>contactForm(id);
+  $("#del").onclick=async()=>{if(!confirm(`Delete ${contactName(x)}? This cannot be undone.`))return;await dbRemove("contacts",id,"Contact");state.detail=null;render();};
   $("#addnote").onclick=()=>noteForm("contact",id,"note");
   $("#logemail").onclick=()=>noteForm("contact",id,"email");
   $("#loglinkedin").onclick=()=>noteForm("contact",id,"linkedin");
@@ -2125,14 +2140,19 @@ function renderCompanies(c){
     });}else{rows.sort((a,b)=>b.updatedAt-a.updatedAt);}
     const setSort=col=>{if(state._coSort.col===col)state._coSort.dir=state._coSort.dir==="asc"?"desc":"asc";else{state._coSort.col=col;state._coSort.dir="asc";}state._coPage=1;draw();};
     const pg=pageSlice(rows,"_coPage");
-    $("#cotable").innerHTML=rows.length?`<table><thead>
+    const coAllChk=pg.rows.length&&pg.rows.every(x=>state._coSel.has(x.id));
+    const coBulk=state._coSel.size?`<div class="bulk-bar"><span>${state._coSel.size} selected</span><button class="btn sm ghost" id="cosel-clear">Clear</button><button class="btn sm danger" id="cosel-del">Delete selected</button></div>`:"";
+    $("#cotable").innerHTML=rows.length?coBulk+`<table><thead>
       <tr>
+        <th class="cb-col"><input type="checkbox" class="sel-all"${coAllChk?" checked":""}></th>
         ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-co-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
         <th></th>
       </tr>
       </thead><tbody>
       ${pg.rows.map(x=>{const cts=live(state.contacts).filter(c2=>c2.companyId===x.id).length;const dl=live(state.deals).filter(d=>d.companyId===x.id&&d.stage!=="Won"&&d.stage!=="Lost");
-        return `<tr data-id="${x.id}"><td><div class="cellname"><span class="ava" style="width:28px;height:28px;border-radius:8px;background:${colorFor(x.name)}">${esc(initials(x.name))}</span>${esc(x.name)}</div></td>
+        return `<tr data-id="${x.id}"${state._coSel.has(x.id)?' class="row-selected"':""}>
+        <td class="cb-col"><input type="checkbox" class="row-sel" data-sel-id="${x.id}"${state._coSel.has(x.id)?" checked":""}></td>
+        <td><div class="cellname"><span class="ava" style="width:28px;height:28px;border-radius:8px;background:${colorFor(x.name)}">${esc(initials(x.name))}</span>${esc(x.name)}</div></td>
         <td class="muted">${esc(x.industry||"—")}</td><td class="muted">${esc(x.size||"—")}</td><td>${cts}</td>
         <td>${dl.length} · ${moneyK(dl.reduce((s,d)=>s+(+d.value||0),0))}</td><td>${x.owner?ava(x.owner,24):'<span class="faint">—</span>'}</td>
         <td class="muted" style="font-size:12px">${x.createdBy?esc(x.createdBy):'<span class="faint">—</span>'}</td>
@@ -2141,8 +2161,13 @@ function renderCompanies(c){
     $("#cotable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
     wirePager($("#cotable"),rows.length,"_coPage",draw);
     COLS.forEach(col=>wireXf("cf-co-"+col.k,{type:col.type,distinct:()=>xfDistinct(list,col.get,col.type),f:xfs[col.k],onApply:f=>{state._coXf[col.k]=f;state._coPage=1;draw();}}));
-    $("#cotable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"company",id:tr.dataset.id};render();});
+    $("#cotable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]")||e.target.closest(".cb-col"))return;state.detail={type:"company",id:tr.dataset.id};render();});
     $("#cotable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();companyForm(b.dataset.edit);});
+    const coSelAll=$("#cotable").querySelector(".sel-all");
+    if(coSelAll)coSelAll.onchange=e=>{e.stopPropagation();if(coSelAll.checked)pg.rows.forEach(x=>state._coSel.add(x.id));else pg.rows.forEach(x=>state._coSel.delete(x.id));draw();};
+    $("#cotable").querySelectorAll(".row-sel").forEach(cb=>cb.onchange=e=>{e.stopPropagation();if(cb.checked)state._coSel.add(cb.dataset.selId);else state._coSel.delete(cb.dataset.selId);draw();});
+    const coSelClr=$("#cosel-clear");if(coSelClr)coSelClr.onclick=e=>{e.stopPropagation();state._coSel.clear();draw();};
+    const coSelDel=$("#cosel-del");if(coSelDel)coSelDel.onclick=async e=>{e.stopPropagation();const n=state._coSel.size;if(!confirm(`Delete ${n} ${n===1?"company":"companies"}? This cannot be undone.`))return;const ids=[...state._coSel];state._coSel.clear();await Promise.all(ids.map(id=>dbRemove("companies",id,"Company")));draw();};
     const n2=$("#newco2");if(n2)n2.onclick=()=>companyForm();
   };
   $("#newco").onclick=()=>companyForm();
@@ -2160,7 +2185,7 @@ function renderCompanyDetail(c,id){
     <button class="backlink" id="back">${I.back} Companies</button>
     <div class="detail-head"><span class="ava big-ava" style="border-radius:16px;background:${colorFor(x.name)}">${esc(initials(x.name))}</span>
       <div style="flex:1"><h1>${esc(x.name)}</h1><div class="meta">${esc(x.industry||"")}${x.website?` · <a href="${esc(x.website)}" target="_blank" rel="noopener">${esc(x.website.replace(/^https?:\/\//,""))}</a>`:""}</div></div>
-      <div style="display:flex;gap:8px"><button class="btn" id="edit">${I.edit}<span>Edit</span></button></div></div>
+      <div style="display:flex;gap:8px"><button class="btn danger" id="del">${I.trash}<span>Delete</span></button><button class="btn" id="edit">${I.edit}<span>Edit</span></button></div></div>
     <div class="stats" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
       <div class="card stat"><div class="lbl">Open pipeline</div><div class="val">${moneyK(openVal)}</div></div>
       <div class="card stat"><div class="lbl">Contacts</div><div class="val">${cts.length}</div></div>
@@ -2181,6 +2206,7 @@ function renderCompanyDetail(c,id){
     </div>`;
   $("#back").onclick=()=>{state.detail=null;render();};
   $("#edit").onclick=()=>companyForm(id);
+  $("#del").onclick=async()=>{if(!confirm(`Delete ${x.name}? This cannot be undone.`))return;await dbRemove("companies",id,"Company");state.detail=null;render();};
   $("#addcontact").onclick=()=>contactForm(null,{companyId:id});
   $("#adddeal").onclick=()=>dealForm(null,{companyId:id});
   $("#co-addnote").onclick=()=>noteForm("company",id,"note");
@@ -2268,10 +2294,14 @@ function renderDeals(c){
       });}else{rows.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));}
       const setSort=col=>{if(state._dSort.col===col)state._dSort.dir=state._dSort.dir==="asc"?"desc":"asc";else{state._dSort.col=col;state._dSort.dir="asc";}state._dPage=1;draw();};
       const pg=pageSlice(rows,"_dPage");
-      $("#dtable").innerHTML=rows.length?`<table><thead><tr>
+      const dAllChk=pg.rows.length&&pg.rows.every(d=>state._dSel.has(d.id));
+      const dBulk=state._dSel.size?`<div class="bulk-bar"><span>${state._dSel.size} selected</span><button class="btn sm ghost" id="dsel-clear">Clear</button><button class="btn sm danger" id="dsel-del">Delete selected</button></div>`:"";
+      $("#dtable").innerHTML=rows.length?dBulk+`<table><thead><tr>
+          <th class="cb-col"><input type="checkbox" class="sel-all"${dAllChk?" checked":""}></th>
           ${COLS.map(col=>`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("dxf-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
           <th></th></tr></thead><tbody>
-          ${pg.rows.map(d=>`<tr data-id="${d.id}">
+          ${pg.rows.map(d=>`<tr data-id="${d.id}"${state._dSel.has(d.id)?' class="row-selected"':""}>
+            <td class="cb-col"><input type="checkbox" class="row-sel" data-sel-id="${d.id}"${state._dSel.has(d.id)?" checked":""}></td>
             <td><div style="font-weight:600;font-size:13px">${esc(d.name)}</div></td>
             <td>${esc(companyById(d.companyId)?.name||"—")}</td>
             <td><span class="chip"><span class="dot" style="background:${stageColor(d.stage)}"></span>${esc(d.stage)}</span></td>
@@ -2286,8 +2316,13 @@ function renderDeals(c){
           </tbody></table>${pagerBar(rows.length,pg.page,pg.per)}`:emptyState("trello","No deals match","Adjust your filters or add a new deal.","New deal","newd2");
       $("#dtable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
       wirePager($("#dtable"),rows.length,"_dPage",draw);
-      $("#dtable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;dealForm(tr.dataset.id);});
+      $("#dtable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]")||e.target.closest(".cb-col"))return;dealForm(tr.dataset.id);});
       $("#dtable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();dealForm(b.dataset.edit);});
+      const dSelAll=$("#dtable").querySelector(".sel-all");
+      if(dSelAll)dSelAll.onchange=e=>{e.stopPropagation();if(dSelAll.checked)pg.rows.forEach(d=>state._dSel.add(d.id));else pg.rows.forEach(d=>state._dSel.delete(d.id));draw();};
+      $("#dtable").querySelectorAll(".row-sel").forEach(cb=>cb.onchange=e=>{e.stopPropagation();if(cb.checked)state._dSel.add(cb.dataset.selId);else state._dSel.delete(cb.dataset.selId);draw();});
+      const dSelClr=$("#dsel-clear");if(dSelClr)dSelClr.onclick=e=>{e.stopPropagation();state._dSel.clear();draw();};
+      const dSelDel=$("#dsel-del");if(dSelDel)dSelDel.onclick=async e=>{e.stopPropagation();const n=state._dSel.size;if(!confirm(`Delete ${n} deal${n===1?"":"s"}? This cannot be undone.`))return;const ids=[...state._dSel];state._dSel.clear();await Promise.all(ids.map(id=>dbRemove("deals",id,"Deal")));draw();};
       const n2=$("#newd2");if(n2)n2.onclick=()=>dealForm();
       COLS.forEach(col=>wireXf("dxf-"+col.k,{type:col.type,distinct:()=>xfDistinct(D,col.get,col.type),f:xfs[col.k],onApply:f=>{state._dXf[col.k]=f;state._dPage=1;draw();}}));
     };
@@ -2406,8 +2441,11 @@ function renderTasks(c){
     });
     const setSort=col=>{if(state._tSort.col===col)state._tSort.dir=state._tSort.dir==="asc"?"desc":"asc";else{state._tSort.col=col;state._tSort.dir="asc";}state._tPage=1;draw();};
     const pg=pageSlice(rows,"_tPage");
-    $("#ttable").innerHTML=rows.length?`<table><thead>
+    const tAllChk=pg.rows.length&&pg.rows.every(t=>state._tSel.has(t.id));
+    const tBulk=state._tSel.size?`<div class="bulk-bar"><span>${state._tSel.size} selected</span><button class="btn sm ghost" id="tsel-clear">Clear</button><button class="btn sm danger" id="tsel-del">Delete selected</button></div>`:"";
+    $("#ttable").innerHTML=rows.length?tBulk+`<table><thead>
       <tr>
+        <th class="cb-col"><input type="checkbox" class="sel-all"${tAllChk?" checked":""}></th>
         ${COLS.map(col=>col.sort===false
           ?`<th${col.w?` style="width:${col.w}"`:""}>${xf("cf-t-"+col.k,col.type,xfs[col.k])}</th>`
           :`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("cf-t-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
@@ -2415,7 +2453,9 @@ function renderTasks(c){
       </tr>
       </thead><tbody>
       ${pg.rows.map(t=>{const rel=relLabel(t);const od=t.status!=="done"&&isOverdue(t.due);
-        return `<tr data-id="${t.id}"><td style="width:40px"><input type="checkbox" data-done="${t.id}" ${t.status==="done"?"checked":""} style="width:18px;height:18px;cursor:pointer;accent-color:var(--accent)"></td>
+        return `<tr data-id="${t.id}"${state._tSel.has(t.id)?' class="row-selected"':""}>
+        <td class="cb-col"><input type="checkbox" class="row-sel" data-sel-id="${t.id}"${state._tSel.has(t.id)?" checked":""}></td>
+        <td style="width:40px"><input type="checkbox" data-done="${t.id}" ${t.status==="done"?"checked":""} style="width:18px;height:18px;cursor:pointer;accent-color:var(--accent)"></td>
         <td><div style="font-weight:500;${t.status==="done"?"text-decoration:line-through;color:var(--faint)":""}">${esc(t.title)}</div>${rel?`<div class="faint" style="font-size:11.5px">${esc(rel)}</div>`:""}</td>
         <td><span class="prio ${t.priority||"low"}">${esc(t.priority||"low")}</span></td>
         <td class="${od?"":"muted"}" style="${od?"color:var(--danger);font-weight:600":""}">${t.due?fmtDate(t.due):"—"}</td>
@@ -2429,7 +2469,12 @@ function renderTasks(c){
     $("#ttable").querySelectorAll("[data-done]").forEach(cb=>cb.onclick=e=>{e.stopPropagation();const t=state.tasks.find(x=>x.id===cb.dataset.done);
       dbUpdate("tasks",cb.dataset.done,{status:cb.checked?"done":"open"},true); if(cb.checked)logActivity("task",`Completed task "${t?.title||""}"`,t?.relatedType,t?.relatedId); draw();});
     $("#ttable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();taskForm(b.dataset.edit);});
-    $("#ttable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-done]")||e.target.closest("[data-edit]"))return;taskForm(tr.dataset.id);});
+    $("#ttable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-done]")||e.target.closest("[data-edit]")||e.target.closest(".cb-col"))return;taskForm(tr.dataset.id);});
+    const tSelAll=$("#ttable").querySelector(".sel-all");
+    if(tSelAll)tSelAll.onchange=e=>{e.stopPropagation();if(tSelAll.checked)pg.rows.forEach(t=>state._tSel.add(t.id));else pg.rows.forEach(t=>state._tSel.delete(t.id));draw();};
+    $("#ttable").querySelectorAll(".row-sel").forEach(cb=>cb.onchange=e=>{e.stopPropagation();if(cb.checked)state._tSel.add(cb.dataset.selId);else state._tSel.delete(cb.dataset.selId);draw();});
+    const tSelClr=$("#tsel-clear");if(tSelClr)tSelClr.onclick=e=>{e.stopPropagation();state._tSel.clear();draw();};
+    const tSelDel=$("#tsel-del");if(tSelDel)tSelDel.onclick=async e=>{e.stopPropagation();const n=state._tSel.size;if(!confirm(`Delete ${n} task${n===1?"":"s"}? This cannot be undone.`))return;const ids=[...state._tSel];state._tSel.clear();await Promise.all(ids.map(id=>dbRemove("tasks",id,"Task")));draw();};
     const n2=$("#newt2");if(n2)n2.onclick=()=>taskForm();
   };
   $("#newt").onclick=()=>taskForm();draw();
@@ -2487,10 +2532,13 @@ function renderTickets(c){
     });}else{rows.sort((a,b)=>b.createdAt-a.createdAt);}
     const setSort=col=>{if(state._tkSort.col===col)state._tkSort.dir=state._tkSort.dir==="asc"?"desc":"asc";else{state._tkSort.col=col;state._tkSort.dir="asc";}state._tkPage=1;draw();};
     const pg=pageSlice(rows,"_tkPage");
+    const tkAllChk=pg.rows.length&&pg.rows.every(x=>state._tkSel.has(x.id));
+    const tkBulk=state._tkSel.size?`<div class="bulk-bar"><span>${state._tkSel.size} selected</span><button class="btn sm ghost" id="tksel-clear">Clear</button><button class="btn sm danger" id="tksel-del">Delete selected</button></div>`:"";
     const tbody=pg.rows.map(x=>{
       const co=companyById(x.companyId),ct=x.contactId?contactById(x.contactId):null;
       const sla=slaStatus(x);
-      return `<tr data-id="${x.id}">
+      return `<tr data-id="${x.id}"${state._tkSel.has(x.id)?' class="row-selected"':""}>
+        <td class="cb-col"><input type="checkbox" class="row-sel" data-sel-id="${x.id}"${state._tkSel.has(x.id)?" checked":""}></td>
         <td><div class="cellname" style="gap:8px"><div><div style="font-weight:600;font-size:13.5px">${esc(x.subject||"—")}</div><div class="faint" style="font-size:11.5px">${esc(x.type||"")}</div></div></div></td>
         <td>${tkStatusChip(x.status)}</td>
         <td>${tkPrioChip(x.priority)}</td>
@@ -2502,8 +2550,9 @@ function renderTickets(c){
         <td><div class="rowact"><button class="btn ghost sm" data-edit="${x.id}">${I.edit}</button></div></td>
       </tr>`;
     }).join("");
-    $("#tktable").innerHTML=rows.length?`<table><thead>
+    $("#tktable").innerHTML=rows.length?tkBulk+`<table><thead>
       <tr>
+        <th class="cb-col"><input type="checkbox" class="sel-all"${tkAllChk?" checked":""}></th>
         ${COLS.map(col=>col.sort===false
           ?`<th>${esc(col.label)}${xf("tk-"+col.k,col.type,xfs[col.k])}</th>`
           :`<th class="${thCls(col.k)}" data-sort="${col.k}">${esc(col.label)}${SI()}${xf("tk-"+col.k,col.type,xfs[col.k])}</th>`).join("")}
@@ -2512,7 +2561,12 @@ function renderTickets(c){
     $("#tktable").querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=e=>{if(e.target.closest(".th-fd"))return;setSort(th.dataset.sort);});
     wirePager($("#tktable"),rows.length,"_tkPage",draw);
     $("#tktable").querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation();ticketForm(b.dataset.edit);});
-    $("#tktable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]"))return;state.detail={type:"ticket",id:tr.dataset.id};render();});
+    $("#tktable").querySelectorAll("tbody tr").forEach(tr=>tr.onclick=e=>{if(e.target.closest("[data-edit]")||e.target.closest(".cb-col"))return;state.detail={type:"ticket",id:tr.dataset.id};render();});
+    const tkSelAll=$("#tktable").querySelector(".sel-all");
+    if(tkSelAll)tkSelAll.onchange=e=>{e.stopPropagation();if(tkSelAll.checked)pg.rows.forEach(x=>state._tkSel.add(x.id));else pg.rows.forEach(x=>state._tkSel.delete(x.id));draw();};
+    $("#tktable").querySelectorAll(".row-sel").forEach(cb=>cb.onchange=e=>{e.stopPropagation();if(cb.checked)state._tkSel.add(cb.dataset.selId);else state._tkSel.delete(cb.dataset.selId);draw();});
+    const tkSelClr=$("#tksel-clear");if(tkSelClr)tkSelClr.onclick=e=>{e.stopPropagation();state._tkSel.clear();draw();};
+    const tkSelDel=$("#tksel-del");if(tkSelDel)tkSelDel.onclick=async e=>{e.stopPropagation();const n=state._tkSel.size;if(!confirm(`Delete ${n} ticket${n===1?"":"s"}? This cannot be undone.`))return;const ids=[...state._tkSel];state._tkSel.clear();await Promise.all(ids.map(id=>dbRemove("tickets",id,"Ticket")));draw();};
     const n2=$("#newtk2");if(n2)n2.onclick=()=>ticketForm();
     COLS.forEach(col=>wireXf("tk-"+col.k,{type:col.type,distinct:()=>xfDistinct(list,col.get,col.type),f:xfs[col.k],onApply:f=>{state._tkXf[col.k]=f;state._tkPage=1;draw();}}));
   };
@@ -3486,7 +3540,8 @@ function contactForm(id, defaults={}){
     <div class="field-row">${companyField}${field("c_status","Status",{type:"select",value:x.status||"Lead",options:["Lead","Qualified","Customer","Churned","Inactive"]})}</div>
     <div class="field-row">${field("c_source","Lead source",{type:"select",value:x.source||"",options:["","Website","Referral","Cold outreach","Event","LinkedIn","Inbound"]})}${field("c_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
     ${field("c_tags","Tags (comma separated)",{value:(x.tags||[]).join(", ")})}
-    <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Notes<button type="button" id="c_dictate" class="btn sm" style="font-size:11px;padding:2px 8px" title="Dictate notes">🎤 Dictate</button></label><textarea id="c_notes">${esc(x.notes||"")}</textarea><div id="c_dictate_status" style="display:none;font-size:11px;color:var(--muted);margin-top:3px"></div></div>`;
+    <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Notes<button type="button" id="c_dictate" class="btn sm" style="font-size:11px;padding:2px 8px" title="Dictate notes">🎤 Dictate</button></label><textarea id="c_notes">${esc(x.notes||"")}</textarea><div id="c_dictate_status" style="display:none;font-size:11px;color:var(--muted);margin-top:3px"></div></div>
+    ${id?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><button type="button" class="btn danger sm" id="c_delete" style="width:100%;justify-content:center">${I.trash}Delete contact</button></div>`:""}`;
   openDrawer(id?"Edit contact":"New contact",body,async()=>{
     let companyId=val("c_company")||null;
     if(!id){
@@ -3547,6 +3602,7 @@ function contactForm(id, defaults={}){
       }catch(e){toast("Microphone access denied","err");}
     };
   },50);
+  if(id)setTimeout(()=>{const b=document.getElementById("c_delete");if(b)b.onclick=async()=>{if(!confirm(`Delete this contact? This cannot be undone.`))return;closeDrawer();await dbRemove("contacts",id,"Contact");if(state.detail?.type==="contact"&&state.detail?.id===id)state.detail=null;render();};},50);
 }
 function companyForm(id){
   const x=id?companyById(id):{};
@@ -3565,7 +3621,8 @@ function companyForm(id){
     <div class="field-row">${field("co_close","Expected close date",{type:"date",value:x.expectedClose?new Date(x.expectedClose).toISOString().slice(0,10):""})}${field("co_owner","Owner",{type:"select",value:x.owner||state.user?.name,options:memberOptions()})}</div>
     ${multiCheckField("co_datasources","Data Sources",DATA_SOURCES,x.dataSources)}
     ${field("co_notes","Notes",{type:"textarea",value:x.notes})}
-    ${newContactSection}`;
+    ${newContactSection}
+    ${id?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><button type="button" class="btn danger sm" id="co_delete" style="width:100%;justify-content:center">${I.trash}Delete company</button></div>`:""}`;
   openDrawer(id?"Edit company":"New company",body,async()=>{
     const data={name:val("co_name"),website:val("co_web"),industry:val("co_ind"),size:val("co_size"),location:val("co_loc"),expectedClose:val("co_close")?new Date(val("co_close")).getTime():null,owner:val("co_owner"),dataSources:multiVals("co_datasources"),notes:val("co_notes")};
     if(!data.name){toast("Company name is required","err");return false;}
@@ -3589,6 +3646,7 @@ function companyForm(id){
     const btn=document.getElementById("co_newc_toggle"),sec=document.getElementById("co_newc_section");
     if(btn&&sec)btn.onclick=()=>{const show=sec.style.display==="none";sec.style.display=show?"block":"none";btn.textContent=show?"✕ Cancel":"＋ Add a contact for this company";if(show){const inp=sec.querySelector("input");if(inp)inp.focus();}};
   },50);
+  if(id)setTimeout(()=>{const b=document.getElementById("co_delete");if(b)b.onclick=async()=>{if(!confirm(`Delete ${x.name}? This cannot be undone.`))return;closeDrawer();await dbRemove("companies",id,"Company");if(state.detail?.type==="company"&&state.detail?.id===id)state.detail=null;render();};},50);
 }
 function dlineRow(p){
   return `<div class="dline"><input class="dl-name" value="${esc(p.name||"")}" placeholder="Product or service"><input class="dl-qty" type="number" value="${esc(String(+p.qty||1))}" min="1" placeholder="1"><input class="dl-price" type="number" value="${esc(String(+p.price||""))}" min="0" step="0.01" placeholder="0.00"><button type="button" class="dlrm" title="Remove">×</button></div>`;
@@ -3615,7 +3673,7 @@ function dealForm(id,defaults={}){
     <div class="field"><label style="display:flex;justify-content:space-between;align-items:center">Products / Line items<button type="button" id="d_addline" class="btn sm" style="font-size:11px;padding:2px 8px">＋ Add line</button></label>
       <div style="display:grid;grid-template-columns:1fr 70px 110px 30px;gap:6px;margin-bottom:5px;padding:0 2px"><span style="font-size:11px;color:var(--faint);font-weight:500">Product / Service</span><span style="font-size:11px;color:var(--faint);font-weight:500">Qty</span><span style="font-size:11px;color:var(--faint);font-weight:500">Unit Price</span><span></span></div>
       <div id="d_lines" class="dlines">${(x.products||[]).map(p=>dlineRow(p)).join("")}</div></div>
-    ${id?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div style="font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Log activity</div><div style="display:flex;gap:6px"><button type="button" class="btn ghost sm" id="d-logemail">${I.mail}Email</button><button type="button" class="btn ghost sm" id="d-loglinkedin">${I.linkedin}LinkedIn</button><button type="button" class="btn ghost sm" id="d-logcall">${I.phone}Call</button><button type="button" class="btn ghost sm" id="d-lognote">${I.note}Note</button></div></div><div class="insight" style="margin-top:6px"><div class="ih">${I.spark}PulseAI + Quote</div><div class="ic-body" id="d-ai">Get an AI risk read, next step, or generate a formatted quote for this deal.</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" id="d-ai-next">${I.flag}Next step</button><button type="button" class="btn sm" id="d-ai-risk">${I.alert}Risk score</button><button type="button" class="btn sm" id="d-quote" style="margin-left:auto">${I.note}Generate quote</button></div></div>`:""}
+    ${id?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div style="font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Log activity</div><div style="display:flex;gap:6px"><button type="button" class="btn ghost sm" id="d-logemail">${I.mail}Email</button><button type="button" class="btn ghost sm" id="d-loglinkedin">${I.linkedin}LinkedIn</button><button type="button" class="btn ghost sm" id="d-logcall">${I.phone}Call</button><button type="button" class="btn ghost sm" id="d-lognote">${I.note}Note</button></div></div><div class="insight" style="margin-top:6px"><div class="ih">${I.spark}PulseAI + Quote</div><div class="ic-body" id="d-ai">Get an AI risk read, next step, or generate a formatted quote for this deal.</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" id="d-ai-next">${I.flag}Next step</button><button type="button" class="btn sm" id="d-ai-risk">${I.alert}Risk score</button><button type="button" class="btn sm" id="d-quote" style="margin-left:auto">${I.note}Generate quote</button></div></div><div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><button type="button" class="btn danger sm" id="d_delete" style="width:100%;justify-content:center">${I.trash}Delete deal</button></div>`:""}
     ${!id?`<div style="margin-top:8px;text-align:right"><span class="faint" style="font-size:11.5px">Save the deal first, then open it to generate a quote.</span></div>`:""}`;
   openDrawer(id?"Edit deal":"New deal",body,async()=>{
     const stage=val("d_stage");
@@ -3661,6 +3719,8 @@ function dealForm(id,defaults={}){
       if(dl)dl.onclick=e=>{e.preventDefault();closeDrawer();setTimeout(()=>noteForm("deal",id,"linkedin"),220);};
       if(dc)dc.onclick=e=>{e.preventDefault();closeDrawer();setTimeout(()=>noteForm("deal",id,"phone"),220);};
       if(dn)dn.onclick=e=>{e.preventDefault();closeDrawer();setTimeout(()=>noteForm("deal",id,"note"),220);};
+      const dd=document.getElementById("d_delete");
+      if(dd)dd.onclick=async()=>{if(!confirm(`Delete "${x.name}"? This cannot be undone.`))return;closeDrawer();await dbRemove("deals",id,"Deal");render();};
     }
   },150);
 }
